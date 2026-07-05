@@ -43,66 +43,130 @@
 // First-person anchor + bounded filler gap. Crisis keywords composed with
 // fp() fire only when an explicit first-person subject precedes them,
 // separated by at most six words from a closed class of auxiliaries,
-// modals, and intensifiers. Any other intervening word (a name, "my
-// brother", "she", "people who") breaks the anchor and the pattern stays
-// silent.
-var FP_HEAD = "\\bi(?:'m|'ve|'d|'ll|m|ve)?";
+// modals, volitional verbs, and intensifiers. Any other intervening word
+// (a name, "my brother", "she", "people who") breaks the anchor and the
+// pattern stays silent. The lookbehind keeps enumeration heads ("chapter
+// i", "act i") from reading the roman numeral as a first-person subject.
+var FP_HEAD =
+  "(?<!\\b(?:chapter|act|section|part|volume|book|phase|article|appendix" +
+  '|scene|episode|season|stage|level|title|figure|table|exhibit|schedule' +
+  "|grade|type|class|war)\\s)\\bi(?:'m|'ve|'d|'ll|m|ve)?";
 var FP_GAP =
   "(?:\\s+(?:am|are|was|be|been|being|has|have|having|had|feel|feels|felt" +
   '|feeling|keep|keeps|kept|get|gets|got|getting|gotten|start|started' +
   "|starting|stop|stopped|can't|cant|cannot|couldn't|couldnt|won't|wont" +
   "|will|would|wouldn't|wouldnt|might|may|could|should|must|want|wanted" +
-  '|wanna|need|needed|gonna|going|about|of|to|think|thinking|thought|like' +
-  '|so|very|really|extremely|incredibly|pretty|honestly|genuinely' +
-  '|seriously|truly|literally|actually|just|still|often|always|constantly' +
-  '|sometimes|occasionally|usually|never|ever|this|that|too|a|an|kinda' +
-  '|lately|recently|again|almost)){0,6}';
+  '|wanting|wanna|need|needed|gonna|going|about|of|to|think|thinking' +
+  '|thought|like|so|very|really|extremely|incredibly|pretty|honestly' +
+  '|genuinely|seriously|truly|literally|actually|just|still|often|always' +
+  '|constantly|sometimes|occasionally|usually|never|ever|this|that|too' +
+  '|a|an|kinda|lately|recently|again|almost|tried|try|trying|plan|plans' +
+  '|planned|planning|decided|decide|intend|hoping|hope|take|took|taking' +
+  '|taken|fucking|freaking|goddamn|damn|completely|totally|deeply' +
+  '|dangerously|quite|super|real|lowkey|low-key|hella)){0,6}';
 
 function fp(tail) {
   return new RegExp(FP_HEAD + FP_GAP + '\\s+' + tail);
 }
 
+// Third-person anti-anchor for subjectless and bare-gerund patterns: a
+// negative lookbehind that goes silent when a third-person subject (a
+// pronoun, or a determiner + one noun) plus a closed chain of verbs,
+// modals, and adverbs immediately precedes the match ("my friend is
+// attempting suicide", "she said she would be better off dead"). The
+// chain class deliberately excludes first-person tokens ("i", "i've") and
+// conjunctions, so "my mom died and i want to die" and "she knows i want
+// to die" keep firing — the chain breaks and the anchor survives.
+var TP_PRON =
+  "(?:he|she|they|we|you|it|who|he's|she's|it's|they're|we're|you're" +
+  "|he'd|she'd|they'd|we'd|you'd)";
+var TP_CHAIN =
+  '(?:\\s+(?:is|are|was|were|be|been|being|has|have|had|says|said|say' +
+  '|saying|keeps|keep|kept|wants|want|wanted|wanting|feels|feel|felt' +
+  '|feeling|thinks|think|thought|thinking|talks|talk|talked|talking' +
+  '|seems|seem|seemed|described|discussed|mentioned|admitted|would|will' +
+  "|might|may|could|should|must|can't|cant|won't|wont|wouldn't|wouldnt" +
+  '|to|about|of|that|still|also|just|really|so|very|often|always|never' +
+  '|ever|sometimes|constantly|recently|lately|apparently|even|again|now' +
+  '|he|she|they|it|we|you|her|him|them|his|their)){0,5}';
+var TP_BLOCK =
+  '(?<!\\b' +
+  TP_PRON +
+  TP_CHAIN +
+  '\\s)(?<!\\b(?:my|his|her|their|your|our|the|this|that|a|an)' +
+  "\\s+[a-z']+" +
+  TP_CHAIN +
+  '\\s)';
+
+// Subjectless first-person forms ("feeling suicidal again", "planning to
+// commit suicide"): a closed class of dropped-subject heads (progressive /
+// perfect / volitional), anti-anchored so third-person subject chains
+// ("she has been feeling suicidal") stay silent. Per the recorded ruling's
+// fire-list, these are treated as elided first person.
+var SL_HEAD =
+  '\\b(?:feeling|feel|felt|been|being|having|planning|planned|plan' +
+  '|wanting|wanted|want|hoping|trying|tried|thinking|decided|going|gonna)';
+
+function sl(tail) {
+  return new RegExp(TP_BLOCK + SL_HEAD + FP_GAP + '\\s+' + tail);
+}
+
+function tp(source) {
+  return new RegExp(TP_BLOCK + source);
+}
+
 // Tier 1: explicit suicidal-ideation / self-harm / method language.
 // Recall-first: within clearly first-person crisis space, prefer to match.
 var TIER1_PATTERNS = [
-  /\bwant(?:ed)?\s+to\s+die\b/,
+  tp('\\bwant(?:ed)?\\s+to\\s+die\\b'),
   /\bwanna\s+die\b/,
   /\bwish\s+i\s+(?:was|were)\s+dead\b/,
   /\bwish\s+i\s+(?:wasn'?t|weren'?t|was\s+not|were\s+not)\s+alive\b/,
   /\bk[i1!]ll(?:ing|ed)?\s+myself\b/,
   /\bunaliv(?:e|ing|ed)\s+(?:myself|me)\b/,
   /^[^a-z0-9]*(?:[a-z']+\s+){0,2}kms(?:\s+[a-z']+){0,2}[^a-z0-9]*$/,
-  new RegExp(
-    "\\bi(?:'m|'ll|'d|m)?\\s+" +
-      '(?:(?:am|was|really|honestly|literally|actually|just|so)\\s+)*' +
-      '(?:want(?:ed)?\\s+to|wanna|gonna|going\\s+to|about\\s+to|might' +
-      '|could|should|will|would|need\\s+to|have\\s+to|to)' +
-      '\\s+(?:just\\s+)?kms\\b'
+  // First-person kms grammar, composed from the shared anchor/gap: the
+  // gap absorbs auxiliaries ("i've been wanting to kms") and a volitional
+  // verb is still required right before "kms", so "i think kms is the
+  // right aws service" stays silent.
+  fp(
+    "(?:want(?:ed|ing)?\\s+to|wanna|gonna|going\\s+to|about\\s+to" +
+      '|th(?:ink(?:ing)?|ought)\\s+(?:about|of)|might|could|should|will' +
+      '|would|need(?:ed)?\\s+to|have\\s+to|hoping\\s+to|tr(?:ying|ied)' +
+      '\\s+to|to)\\s+(?:just\\s+)?kms\\b'
   ),
-  /\bend(?:ing)?\s+(?:it\s+all|my\s+(?:own\s+)?life)\b/,
+  // Trailing vent: ", kms" / newline + "kms" at the very end of the
+  // message. Distance/technical uses never sit alone after a clause break
+  // at end of message.
+  /(?:[.!?,;:…]|\n)\s*kms\b[^a-z0-9]*$/,
+  /\bend(?:ing)?\s+my\s+(?:own\s+)?life\b/,
+  tp('\\bend(?:ing)?\\s+it\\s+all\\b'),
   /\bwant(?:ed)?\s+to\s+end\s+it\b/,
   /\bthink(?:ing)?\s+(?:about|of)\s+ending\s+it\b/,
   /\b(?:don'?t|do\s+not)\s+(?:want\s+to|wanna)\s+be\s+here\b/,
   /\b(?:don'?t|do\s+not)\s+(?:want\s+to|wanna)\s+live\b/,
   /\b(?:want(?:ed)?\s+to|wanna)\s+be\s+dead\b/,
   /\bbetter\s+off\s+without\s+me\b/,
-  /\bbetter\s+off\s+dead\b/,
+  tp('\\bbetter\\s+off\\s+dead\\b'),
   /\b(?:no\s+one|no-one|nobody)\s+would\s+miss\s+me\b/,
   /\b(?:cut|cutting|hurt|hurting|harm|harming|harmed|hang|hanging|hanged)\s+myself\b/,
   /\bsh(?:oot|ooting|ot)\s+myself\b(?!\s+in\s+the\s+foot)/,
-  /\b(?:to|gonna|might|could|should|would|wanna)\s+(?:just\s+)?off\s+myself\b/,
+  /\b(?:to|gonna|might|could|should|would|wanna|will|i'?ll|i)\s+(?:just\s+)?off\s+myself\b/,
   /\boffing\s+myself\b/,
-  /\bself[-\s]?harm/,
+  /\bself[-\s]?harm(?!\s+(?:awareness|prevention)\b)/,
   fp('suicidal\\b'),
-  /(?<!\b(?:his|her|their|your)\s)(?<!\w's\s)\bsuicidal\s+(?:thoughts?|ideation)\b/,
+  sl('suicidal\\b'),
+  /\b(?:my|the)\s+suicidal\s+(?:thoughts?|ideation)\b/,
   fp('th(?:ink(?:ing)?|ought)\\s+(?:about|of)\\s+suicide\\b'),
-  fp('commit(?:ting)?\\s+suicide\\b'),
+  fp('commit(?:ted|ting)?\\s+suicide\\b'),
+  sl('commit(?:ted|ting)?\\s+suicide\\b'),
   fp('attempt(?:ed|ing)?\\s+suicide\\b'),
-  /\battempting\s+suicide\b/,
+  tp('\\battempting\\s+suicide\\b'),
   fp('overdos(?:e|ed|ing)\\b'),
-  /\bthink(?:ing)?\s+(?:about|of)\s+overdosing\b/,
+  sl('overdos(?:e|ed|ing)\\b'),
+  tp('\\bthink(?:ing)?\\s+(?:about|of)\\s+overdosing\\b'),
   /\bmy\s+suicide\s+(?:note|plan|attempt)\b/,
-  /\bplan(?:ning|ned)?\s+to\s+(?:die|kill|end\s+(?:it|my\s+life))\b/,
+  tp('\\bplan(?:ning|ned)?\\s+to\\s+(?:die|kill|end\\s+(?:it|my\\s+life))\\b'),
   /\bplan(?:ning|ned)?\s+my\s+(?:own\s+)?suicide\b/,
   /\b(?:tak(?:e|ing)|took)\s+my\s+(?:own\s+)?life\b/
 ];
@@ -115,7 +179,12 @@ var TIER2_PATTERNS = [
   /\bsaying\s+(?:my\s+)?goodbyes?\b/,
   /\bfinal\s+goodbyes?\b/,
   /\bwon'?t\s+matter\s+soon\b/,
-  /\b(?:can'?t|cannot)\s+(?:do\s+this|go\s+on|take\s+(?:it|this))(?:\s+(?:anymore|any\s+more|like\s+this))?(?=\s*(?:$|[.!?,;:)"'…-]))/,
+  // The can't-go-on family is anchored to the end of a clause: end of
+  // message, a newline (normalize preserves newlines as clause
+  // boundaries), or any non-alphanumeric tail (punctuation, emoji). When
+  // an "anymore"/"like this" tail is present the phrase is unambiguous,
+  // so coordinated continuation is allowed ("...anymore and i'm scared").
+  /\b(?:can'?t|cannot)\s+(?:do\s+this|go\s+on|take\s+(?:it|this))(?:\s+(?:anymore|any\s+more|like\s+this)\b|(?= *(?:$|\n|[^a-z0-9\s])))/,
   /\bno\s+reason\s+to\s+(?:live|go\s+on|keep\s+going)\b/,
   /\bnothing\s+(?:left\s+)?to\s+live\s+for\b/,
   /\bno\s+point\s+in\s+(?:living|going\s+on)\b/,
@@ -170,10 +239,14 @@ if (envTimeout > 0) {
 var MAX_STDIN_CHARS = 4 * 1024 * 1024;
 
 function normalize(text) {
+  // Newlines are preserved as clause boundaries (distressed typing is
+  // often unpunctuated and multi-line); only intra-line whitespace is
+  // collapsed. Patterns still match across lines via \s+.
   return text
     .replace(/[‐-―−]/g, '-')
     .replace(/[‘’‛ʼ`´]/g, "'")
-    .replace(/\s+/g, ' ')
+    .replace(/\r\n?/g, '\n')
+    .replace(/[^\S\n]+/g, ' ')
     .toLowerCase();
 }
 

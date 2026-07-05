@@ -175,6 +175,132 @@ test('tier-2: end-of-clause crisis forms still fire (round-2 F17)', () => {
   assertFires("I can't take it anymore, everything feels heavy");
 });
 
+test('tier-1: volitional, intensifier, take, past, and modal forms fire (round-3 F27)', () => {
+  // Volitional gap verbs
+  assertFires('I tried to commit suicide last year');
+  assertFires('I plan to commit suicide');
+  assertFires('I decided to commit suicide');
+  assertFires('I intend to commit suicide');
+  assertFires('I tried to overdose');
+  // Intensifiers, including the profanity register
+  assertFires("I'm fucking suicidal");
+  assertFires('I feel completely suicidal');
+  assertFires("I'm deeply suicidal");
+  assertFires("I've been super suicidal lately");
+  assertFires("I'm lowkey suicidal");
+  assertFires("I'm quite suicidal");
+  // Take-forms of the overdose family
+  assertFires('I took an overdose of pills last night');
+  assertFires("I'm going to take an overdose");
+  // Past tail
+  assertFires('I almost committed suicide');
+  // Off-myself modal allowlist
+  assertFires("I'll off myself");
+  assertFires('before I off myself');
+});
+
+test('tier-1: subjectless first-person forms fire consistently (round-3 F28)', () => {
+  assertFires('feeling suicidal again');
+  assertFires('been suicidal all week');
+  assertFires('planning to commit suicide');
+  assertFires('want to commit suicide');
+  assertFires('been thinking about committing suicide');
+});
+
+test('negatives: third-person-anchored subjectless forms stay silent (round-3 F28)', () => {
+  assertSilent('she has been feeling suicidal');
+});
+
+test('tier-2: clause anchor handles newlines, continuation, and emoji tails (round-3 F29)', () => {
+  assertFires("I can't go on\neverything hurts"); // newline as clause boundary
+  assertFires("I can't do this anymore and I'm scared of what I might do");
+  assertFires('i cant go on 😢');
+});
+
+test('negatives: clause anchor keeps everyday objects silent (round-3 F29)', () => {
+  assertSilent("I can't do this presentation");
+  assertSilent("can't go on this diet");
+  assertSilent("I can't go on and on about it");
+});
+
+test('negatives: third-person subject chains and topical suffixes stay silent (round-3 F30)', () => {
+  assertSilent('she has suicidal thoughts');
+  assertSilent('my son has suicidal thoughts');
+  assertSilent("he's having suicidal thoughts");
+  assertSilent('my daughter described suicidal thoughts to her counselor');
+  assertSilent('the article discussed suicidal ideation in teens');
+  assertSilent('patients with suicidal ideation need screening');
+  assertSilent('my friend is attempting suicide');
+  assertSilent('he is attempting suicide');
+  assertSilent('my son keeps thinking about overdosing');
+  assertSilent('she planned to kill herself');
+  assertSilent('my brother is planning to end it');
+  assertSilent('he keeps talking about ending it all');
+  assertSilent('my brother wants to end it all');
+  assertSilent('my dad wanted to die at the end, in hospice');
+  assertSilent('she said she would be better off dead');
+  assertSilent('self-harm awareness month');
+});
+
+test('tier-1: first-person forms adjacent to the F30 silent class keep firing (round-3 F30)', () => {
+  assertFires('having suicidal thoughts');
+  assertFires("I've been having suicidal thoughts");
+  assertFires('my suicidal thoughts are back');
+  assertFires('the suicidal ideation is back');
+  assertFires('I want to end it all');
+  assertFires('I engage in self-harm');
+  // The anti-anchor chain excludes first-person tokens and conjunctions,
+  // so an embedded first-person clause survives a third-person prefix.
+  assertFires('she knows i want to die');
+  assertFires('my mom died and i want to die too');
+  assertFires('they said i would be better off dead');
+});
+
+test('tier-1: kms grammar composed from the first-person anchor (round-3 F32)', () => {
+  assertFires("i've been wanting to kms");
+  assertFires("i've been thinking about kms");
+  assertFires('i keep wanting to kms');
+  assertFires('this week has been awful, kms'); // trailing vent
+});
+
+test('negatives: enumeration heads do not read as a first-person subject (round-3 F36)', () => {
+  assertSilent('chapter i was about overdose prevention');
+  assertSilent('act i was so suicidal in tone');
+});
+
+test('FP_GAP membership guard: dropping a gap word breaks the suite (round-3 F36)', () => {
+  // Source-level guard: every closed-class gap word the matcher depends on
+  // must stay in the FP_GAP alternation. A behavioral phrase per family
+  // lives in the F27/F28 tests; this catches a silently dropped word.
+  const hookSource = readFileSync(HOOK_PATH, 'utf8');
+  const decl = hookSource.match(/var FP_GAP =[\s\S]*?;/);
+  assert.ok(decl, 'FP_GAP declaration found in hook source');
+  // Flatten the concatenated string literals into one alternation body.
+  const flat = decl[0].replace(/["'+\s]/g, '');
+  const required = [
+    // auxiliaries / progressives
+    'am', 'been', 'being', 'have', 'having', 'feel', 'feeling', 'keep',
+    'going', 'gonna', 'thinking', 'almost',
+    // volitional verbs (round-3 F27)
+    'tried', 'try', 'trying', 'plan', 'plans', 'planned', 'planning',
+    'decided', 'decide', 'intend', 'hoping', 'hope', 'wanting',
+    // take-forms (round-3 F27)
+    'take', 'took', 'taking', 'taken',
+    // intensifiers incl. profanity register (round-3 F27)
+    'fucking', 'freaking', 'goddamn', 'damn', 'completely', 'totally',
+    'deeply', 'seriously', 'dangerously', 'quite', 'super', 'real',
+    'really', 'lowkey', 'low-key', 'hella'
+  ];
+  for (const word of required) {
+    assert.ok(
+      flat.includes(`|${word}|`) ||
+        flat.includes(`|${word})`) ||
+        flat.includes(`:${word}|`),
+      `FP_GAP is missing gap word: ${word}`
+    );
+  }
+});
+
 test('tier-1: first-person suicide phrasings fire (round-1 F12)', () => {
   assertFires("I'm suicidal");
   assertFires('I am suicidal');
