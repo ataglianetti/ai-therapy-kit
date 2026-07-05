@@ -10,8 +10,9 @@
 //
 // The Emergency Resources text injected below is sourced verbatim from
 // `safety-protocol.md` (Emergency Resources block). If that block changes,
-// this file must be updated to match — a test enforces that both files
-// carry the same core resources (988, 741741, 911, findahelpline.com).
+// this file must be updated to match — a test extracts the fenced block
+// from `safety-protocol.md` and asserts the injected text contains it
+// verbatim, line for line.
 //
 // LIMITATION: patterns are English-only. Crisis language in other
 // languages will not trigger this hook. The prose protocol still applies.
@@ -22,25 +23,42 @@
 // no import/export/require — and is valid under both parse modes.
 //
 // Fail-open contract: on ANY error (malformed JSON, empty stdin, missing
-// or non-string prompt), exit 0 with no output. A broken hook must never
-// break a session.
+// or non-string prompt, closed stdout, stdin that never ends), exit 0 with
+// no output. A broken hook must never break a session.
+//
+// Pattern convention: input is normalized (lowercased, unicode punctuation
+// folded, whitespace collapsed) before matching, so every pattern source
+// below must be lowercase. A test enforces this.
 
 'use strict';
 
 // Tier 1: explicit suicidal-ideation / self-harm / method language.
+// Recall-first: within clearly first-person crisis space, prefer to match.
 var TIER1_PATTERNS = [
   /\bwant(?:s|ed)?\s+to\s+die\b/,
   /\bwanna\s+die\b/,
   /\bwish\s+i\s+(?:was|were)\s+dead\b/,
-  /\bkill(?:ing|ed)?\s+myself\b/,
-  /\bend\s+(?:it\s+all|my\s+life)\b/,
+  /\bwish\s+i\s+(?:wasn'?t|weren'?t|was\s+not|were\s+not)\s+alive\b/,
+  /\bk[i1!]ll(?:ing|ed)?\s+myself\b/,
+  /\bunaliv(?:e|ing|ed)\s+(?:myself|me)\b/,
+  /(?<!\d\s?)\bkms\b/,
+  /\bend(?:ing)?\s+(?:it\s+all|my\s+(?:own\s+)?life)\b/,
   /\bwant(?:s|ed)?\s+to\s+end\s+it\b/,
-  /\b(?:don'?t|do\s+not)\s+want\s+to\s+be\s+here\b/,
+  /\bthink(?:ing)?\s+(?:about|of)\s+ending\s+it\b/,
+  /\b(?:don'?t|do\s+not)\s+(?:want\s+to|wanna)\s+be\s+here\b/,
+  /\b(?:don'?t|do\s+not)\s+(?:want\s+to|wanna)\s+live\b/,
+  /\b(?:want(?:s|ed)?\s+to|wanna)\s+be\s+dead\b/,
   /\bbetter\s+off\s+without\s+me\b/,
-  /\b(?:cut|cutting|hurt|hurting|harm|harming)\s+myself\b/,
+  /\bbetter\s+off\s+dead\b/,
+  /\b(?:no\s+one|no-one|nobody)\s+would\s+miss\s+me\b/,
+  /\b(?:cut|cutting|hurt|hurting|harm|harming|hang|hanging|shoot|shooting|off|offing)\s+myself\b/,
   /\bself[-\s]?harm/,
-  /\bsuicid(?:e|al)\b/,
-  /\btak(?:e|ing)\s+my\s+(?:own\s+)?life\b/,
+  /\b(?:i'?m|i\s+am|i\s+feel|feel(?:ing)?|been)\s+suicidal\b/,
+  /\bsuicidal\s+(?:thoughts?|ideation)\b/,
+  /\bthink(?:ing)?\s+(?:about|of)\s+suicide\b/,
+  /\bcommit(?:ting)?\s+suicide\b/,
+  /\bmy\s+suicide\s+(?:note|plan|attempt)\b/,
+  /\b(?:tak(?:e|ing)|took)\s+my\s+(?:own\s+)?life\b/,
   /\bplan\s+to\s+(?:die|kill|end\s+my\s+life)\b/,
   /\boverdos(?:e|ed|ing)\b/
 ];
@@ -48,15 +66,16 @@ var TIER1_PATTERNS = [
 // Tier 2: conservative warning-sign phrasings (kept minimal on purpose;
 // tuning happens later with evals).
 var TIER2_PATTERNS = [
-  /\bgiv(?:e|ing|en)\s+(?:away\s+)?(?:all\s+(?:of\s+)?)?my\s+(?:things|stuff|belongings|possessions)(?:\s+away)?\b/,
-  /\bsaying\s+my\s+goodbyes\b/,
+  /\b(?:giv(?:e|ing|en)|gave)\s+(?:away\s+)?(?:all\s+(?:of\s+)?)?my\s+(?:things|stuff|belongings|possessions)(?:\s+away)?\b/,
+  /\bsaying\s+(?:my\s+)?goodbyes?\b/,
   /\bfinal\s+goodbyes?\b/,
   /\bwon'?t\s+matter\s+soon\b/,
-  /\b(?:can'?t|cannot)\s+(?:do\s+this|go\s+on|take\s+(?:it|this))\s+anymore\b/,
+  /\b(?:can'?t|cannot)\s+(?:do\s+this|go\s+on|take\s+(?:it|this))(?:\s+anymore)?\b/,
   /\bno\s+reason\s+to\s+(?:live|go\s+on|keep\s+going)\b/,
   /\bnothing\s+(?:left\s+)?to\s+live\s+for\b/,
   /\bno\s+point\s+in\s+(?:living|going\s+on)\b/,
-  /\bno\s+way\s+out\b/
+  /\bno\s+way\s+out\b/,
+  /\bbetter\s+off\s+if\s+i\s+(?:was|were)\s+gone\b/
 ];
 
 // Verbatim from safety-protocol.md > Emergency Resources. Do not edit here
@@ -92,7 +111,8 @@ var ADDITIONAL_CONTEXT =
 
 function normalize(text) {
   return text
-    .replace(/[‘’]/g, "'")
+    .replace(/[‐-―−]/g, '-')
+    .replace(/[‘’‛ʼ`´]/g, "'")
     .replace(/\s+/g, ' ')
     .toLowerCase();
 }
@@ -108,7 +128,7 @@ function main(input) {
   var payload = JSON.parse(input);
   var prompt = payload && payload.prompt;
   if (typeof prompt !== 'string' || prompt.length === 0) {
-    process.exit(0);
+    return;
   }
   var text = normalize(prompt);
   if (matchesAny(TIER1_PATTERNS, text) || matchesAny(TIER2_PATTERNS, text)) {
@@ -121,25 +141,42 @@ function main(input) {
       }) + '\n'
     );
   }
-  process.exit(0);
 }
 
-try {
-  var chunks = [];
-  process.stdin.setEncoding('utf8');
-  process.stdin.on('data', function (chunk) {
-    chunks.push(chunk);
-  });
-  process.stdin.on('end', function () {
-    try {
-      main(chunks.join(''));
-    } catch (err) {
-      process.exit(0);
-    }
-  });
-  process.stdin.on('error', function () {
-    process.exit(0);
-  });
-} catch (err) {
-  process.exit(0);
+// Never crash on stdout errors (e.g. EPIPE when the reader closed the
+// pipe). Fail-open means exit 0 silently, never a nonzero write crash.
+process.stdout.on('error', function () {});
+
+// Self-timeout: if stdin never ends (harness bug, unusual spawn), exit 0
+// silently rather than hanging until the harness kills us. The timer is
+// unref'd so it never delays a normal run. SAFETY_NET_STDIN_TIMEOUT_MS
+// overrides the 5000ms default (used by tests to keep the suite fast).
+var STDIN_TIMEOUT_MS = 5000;
+var envTimeout = Number(process.env.SAFETY_NET_STDIN_TIMEOUT_MS);
+if (envTimeout > 0) {
+  STDIN_TIMEOUT_MS = envTimeout;
 }
+var stdinTimer = setTimeout(function () {
+  process.exit(0);
+}, STDIN_TIMEOUT_MS);
+if (stdinTimer.unref) stdinTimer.unref();
+
+var chunks = [];
+process.stdin.setEncoding('utf8');
+process.stdin.on('data', function (chunk) {
+  chunks.push(chunk);
+});
+process.stdin.on('end', function () {
+  clearTimeout(stdinTimer);
+  try {
+    main(chunks.join(''));
+  } catch (err) {
+    // Fail-open: swallow and fall through to a natural exit 0.
+  }
+  // No process.exit() here: a pending stdout write (the crisis notice)
+  // must be allowed to flush. With stdin ended and the timer cleared,
+  // the event loop drains and the process exits 0 on its own.
+});
+process.stdin.on('error', function () {
+  process.exit(0);
+});
