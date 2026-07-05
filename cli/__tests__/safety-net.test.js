@@ -443,6 +443,66 @@ test('tier-1: apostrophe-less first-person clause rescue fires (round-5 F51)', (
   assertFires('im holding the pills to end it all');
 });
 
+test('negatives: genitive and modified possessive-of-other thoughts stay silent (round-6 F53)', () => {
+  assertSilent("my brother's suicidal thoughts scare me");
+  assertSilent('my sons suicidal ideation worries me so much');
+  assertSilent("my mom's suicidal thoughts scare me");
+  assertSilent("her coworker's suicidal thoughts came up at work");
+  assertSilent("my daughter's suicidal ideation is getting worse");
+  assertSilent('the patients suicidal ideation worsened overnight');
+  // Pronoun possessive reaches across a short modifier gap.
+  assertSilent('his intrusive suicidal thoughts scare his wife');
+  assertSilent('her constant suicidal ideation worries me');
+  assertSilent('their recurring suicidal thoughts need treatment');
+});
+
+test('tier-1: first-person possessive and elided-determiner forms keep firing (round-6 F53)', () => {
+  assertFires('my intrusive suicidal thoughts are back');
+  assertFires('the constant suicidal thoughts wont stop');
+  assertFires('my suicidal thoughts are back');
+  assertFires('these suicidal thoughts wont stop');
+  assertFires('our suicidal thoughts are back');
+  // Non-genitive s-enders err toward fire (boundary of the genitive guard).
+  assertFires('my relentless suicidal thoughts are back');
+  assertFires('some nights suicidal thoughts take over');
+  assertFires('this suicidal ideation is destroying me');
+});
+
+test('tier-1: overdose help imperatives with kinship, service, and bare tails fire (round-6 F54)', () => {
+  assertFires('i overdosed call mom');
+  assertFires('i overdosed call dad please');
+  assertFires('im going to overdose call mom please');
+  assertFires('i overdosed call poison control');
+  assertFires('i overdosed call police');
+  assertFires('i overdosed call emergency services');
+  assertFires('i overdosed call for help');
+  assertFires('i overdosed call for an ambulance');
+  assertFires('i overdosed call now');
+});
+
+test('negatives: professional overdose-call continuations stay silent (round-6 F54)', () => {
+  // Boundary of the continuation blocklist: workplace/time compounds only.
+  assertSilent('i took an overdose call an hour into my shift');
+  assertSilent('i took an overdose call the other day at work');
+  assertSilent('i take overdose calls a lot at work');
+  assertSilent('i handled an overdose call yesterday');
+  assertSilent('the overdose call center is hiring');
+});
+
+test('tier-1: first-person clauses behind professional with-heads fire (round-6 F55)', () => {
+  assertFires("i'm one of those people struggling with suicidal thoughts");
+  assertFires('as someone dealing with suicidal thoughts i need help');
+  assertFires('im one of those people living with suicidal ideation');
+});
+
+test('negatives: subjectless professional/topical with-forms stay silent (round-6 F55)', () => {
+  // Boundary of the clause rescue: no first-person token in the clause.
+  assertSilent('patients with suicidal ideation need screening');
+  assertSilent('teens who struggle with suicidal thoughts');
+  assertSilent('people with suicidal thoughts deserve support');
+  assertSilent('so many people struggle with suicidal thoughts');
+});
+
 // Extract a word-class declaration from the hook source and return its
 // alternation members as a plain array ("var NAME = 'a|b' + '|c';" → [a,b,c]).
 function wordClass(hookSource, name) {
