@@ -8,7 +8,14 @@
 // hand-written variants all match. Loose matching is what prevents the merge
 // from double-registering the hook against an entry we didn't write ourselves.
 
-import { readFile, writeFile, rename, unlink } from 'node:fs/promises';
+import {
+  readFile,
+  writeFile,
+  rename,
+  unlink,
+  stat,
+  chmod,
+} from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { dirname, join, basename } from 'node:path';
 import { randomBytes } from 'node:crypto';
@@ -90,19 +97,24 @@ export function parseSettingsForMerge(raw) {
     };
   }
   const hooksVal = candidate.hooks;
-  const promptHooks = hooksVal?.UserPromptSubmit;
-  const shapeOk =
-    (hooksVal === undefined ||
-      (typeof hooksVal === 'object' &&
-        hooksVal !== null &&
-        !Array.isArray(hooksVal))) &&
-    (promptHooks === undefined || Array.isArray(promptHooks));
-  if (!shapeOk) {
+  if (
+    hooksVal !== undefined &&
+    (typeof hooksVal !== 'object' || hooksVal === null || Array.isArray(hooksVal))
+  ) {
     return {
       ok: false,
       code: 'bad_shape',
       reason:
-        'hooks.UserPromptSubmit has an unexpected shape — left untouched; register the safety-net hook manually.',
+        '"hooks" is not an object — left untouched; register the safety-net hook manually.',
+    };
+  }
+  const promptHooks = hooksVal?.UserPromptSubmit;
+  if (promptHooks !== undefined && !Array.isArray(promptHooks)) {
+    return {
+      ok: false,
+      code: 'bad_shape',
+      reason:
+        '"hooks.UserPromptSubmit" is not an array — left untouched; register the safety-net hook manually.',
     };
   }
   return { ok: true, settings: candidate };
@@ -158,15 +170,30 @@ export async function applySafetyNetMerge(settingsPath) {
   return { merged: true, backup };
 }
 
-async function writeFileAtomic(target, content) {
+// Exported for direct testing (temp-file cleanup and mode preservation are
+// hard to exercise through the CLI alone). Preserves the target's existing
+// file mode: rename() replaces the inode, so without an explicit chmod a
+// user's `chmod 600 settings.json` would silently become the default 0644
+// after a merge. New files get the platform default.
+export async function writeFileAtomic(target, content) {
+  let mode = null;
+  try {
+    mode = (await stat(target)).mode & 0o777;
+  } catch {
+    // Target doesn't exist (or isn't stat-able) — use the default mode.
+  }
   const tmp = join(
     dirname(target),
     `.${basename(target)}.tmp-${process.pid}-${randomBytes(4).toString('hex')}`
   );
-  await writeFile(tmp, content, 'utf8');
   try {
+    await writeFile(tmp, content, 'utf8');
+    if (mode !== null) await chmod(tmp, mode);
     await rename(tmp, target);
   } catch (err) {
+    // Clean up the temp file whether the write, chmod, or rename failed —
+    // a failed *write* (e.g. ENOSPC) can leave a partial temp file behind
+    // just as a failed rename can.
     await unlink(tmp).catch(() => {});
     throw err;
   }

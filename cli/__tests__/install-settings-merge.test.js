@@ -11,6 +11,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import {
+  chmodSync,
   mkdtempSync,
   readdirSync,
   readFileSync,
@@ -211,6 +212,50 @@ test('install --force with malformed settings skips with a reason, file untouche
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+// F33: an fs failure inside the merge apply (read-only .claude/ makes the
+// pre-merge backup copy fail) must downgrade to a skipped item — the rest of
+// the install, including version.json, still completes.
+test(
+  'install --force with fs failure during merge skips with the error, install completes',
+  { skip: process.platform === 'win32' },
+  () => {
+    const { dir, root, settingsPath } = freshInstall();
+    const claudeDir = path.join(root, '.claude');
+    try {
+      const before = JSON.stringify(TIME_HOOK_SETTINGS, null, 2) + '\n';
+      writeFileSync(settingsPath, before);
+      chmodSync(claudeDir, 0o555); // read-only: backup + temp write both fail
+
+      const res = runJson(
+        [...INSTALL_ARGS(root), '--force'],
+        'install --force read-only'
+      );
+      chmodSync(claudeDir, 0o755);
+
+      assert.equal(res.status, 0, `exit 0 (stderr: ${res.stderr})`);
+      assert.equal(res.json.ok, true, 'install completes despite the fs failure');
+
+      const merges = res.json.settings_merge;
+      assert.equal(merges.length, 1);
+      assert.equal(merges[0].action, 'skipped');
+      assert.ok(
+        merges[0].reason.includes('settings merge failed'),
+        `skip reason carries the error: ${merges[0].reason}`
+      );
+
+      assert.equal(
+        readFileSync(settingsPath, 'utf8'),
+        before,
+        'settings.json left untouched'
+      );
+      assert.equal(settingsBackups(root).length, 0, 'no backup created');
+    } finally {
+      chmodSync(claudeDir, 0o755);
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }
+);
 
 test('fresh install scaffolds the template with the hook already registered (no merge)', () => {
   const { dir, root, settingsPath } = freshInstall();

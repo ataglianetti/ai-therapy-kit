@@ -47,14 +47,31 @@ export function checkClaudeCodeVersion(
   return { status: 'ok', version };
 }
 
+// How to spawn `claude --version` on this platform. On Windows, `claude`
+// resolves to a .cmd shim (npm install) or .exe (native installer) that
+// spawnSync can't execute without a shell — so the version check would stay
+// permanently silent exactly where the exec-form floor risk lives. shell:true
+// on win32 only lets cmd.exe resolve the shim via PATHEXT. Command and args
+// are fixed literals, so there is no injection surface. Pure function,
+// exported for direct testing (no Windows box required).
+export function claudeVersionSpawnPlan(platform = process.platform) {
+  return {
+    command: 'claude',
+    args: ['--version'],
+    shell: platform === 'win32',
+  };
+}
+
 // Spawn seam for the version check. Returns raw `claude --version` output, or
 // null when the CLI isn't on PATH / errors / times out — doctor may run in
 // environments where claude isn't visible, and that must not raise alarms.
 function readClaudeVersionOutput() {
+  const plan = claudeVersionSpawnPlan();
   try {
-    const result = spawnSync('claude', ['--version'], {
+    const result = spawnSync(plan.command, plan.args, {
       encoding: 'utf8',
       timeout: 5000,
+      shell: plan.shell,
     });
     if (result.error || result.status !== 0) {
       return null;

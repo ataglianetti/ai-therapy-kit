@@ -17,8 +17,38 @@ import path from 'node:path';
 import {
   doctor,
   checkClaudeCodeVersion,
+  claudeVersionSpawnPlan,
   MIN_CLAUDE_CODE_VERSION,
 } from '../doctor.js';
+
+// ---------------------------------------------------------------------------
+// Spawn plan (F35): on win32, `claude` is a .cmd/.exe shim spawnSync can't
+// resolve without a shell — the version check would be permanently silent
+// there. Command and args must stay fixed literals (no injection surface).
+// ---------------------------------------------------------------------------
+
+test('spawn plan on win32: shell enabled, fixed command and args', () => {
+  const plan = claudeVersionSpawnPlan('win32');
+  assert.equal(plan.command, 'claude');
+  assert.deepEqual(plan.args, ['--version']);
+  assert.equal(plan.shell, true);
+});
+
+test('spawn plan on unix platforms: direct spawn, no shell', () => {
+  for (const platform of ['darwin', 'linux']) {
+    const plan = claudeVersionSpawnPlan(platform);
+    assert.equal(plan.command, 'claude', `${platform} command`);
+    assert.deepEqual(plan.args, ['--version'], `${platform} args`);
+    assert.equal(plan.shell, false, `${platform} shell off`);
+  }
+});
+
+test('spawn plan defaults to the current platform', () => {
+  assert.deepEqual(
+    claudeVersionSpawnPlan(),
+    claudeVersionSpawnPlan(process.platform)
+  );
+});
 
 // ---------------------------------------------------------------------------
 // Pure parse/compare logic

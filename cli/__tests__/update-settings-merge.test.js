@@ -8,10 +8,12 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import {
+  chmodSync,
   mkdtempSync,
   readdirSync,
   readFileSync,
   rmSync,
+  statSync,
   writeFileSync,
 } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -288,10 +290,95 @@ test('human output surfaces a skipped merge with its reason', () => {
         result.stdout.includes('not valid JSON'),
       `skip line with reason printed\nstdout: ${result.stdout}`
     );
+    // F36: "Already up to date." right after a skip notice reads as a
+    // contradiction — it must be suppressed when a merge skip was reported.
+    assert.ok(
+      !result.stdout.includes('Already up to date.'),
+      `"Already up to date." suppressed after a skip\nstdout: ${result.stdout}`
+    );
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+// F33: an fs failure inside the merge apply (here: the pre-merge backup copy
+// into a read-only .claude/) must downgrade to a skipped item — not crash the
+// run after framework files are written but before version.json is, which
+// would leave a stale hash registry behind.
+test(
+  'fs failure during merge apply downgrades to a skip; update still completes',
+  { skip: process.platform === 'win32' },
+  () => {
+    const { dir, root, settingsPath } = freshInstall();
+    const claudeDir = path.join(root, '.claude');
+    try {
+      const before = JSON.stringify(TIME_HOOK_SETTINGS, null, 2) + '\n';
+      writeFileSync(settingsPath, before);
+      chmodSync(claudeDir, 0o555); // read-only: backup + temp write both fail
+
+      const res = runJson(['update', '--path', root], 'update read-only');
+      chmodSync(claudeDir, 0o755);
+
+      assert.equal(res.status, 0, `exit 0 (stderr: ${res.stderr})`);
+      assert.equal(res.json.ok, true, 'run completes despite the fs failure');
+
+      const merges = res.json.plan.settings_merge;
+      assert.equal(merges.length, 1);
+      assert.equal(merges[0].action, 'skipped');
+      assert.ok(
+        merges[0].reason.includes('settings merge failed'),
+        `skip reason carries the error: ${merges[0].reason}`
+      );
+
+      assert.equal(
+        readFileSync(settingsPath, 'utf8'),
+        before,
+        'settings.json left untouched'
+      );
+      assert.equal(settingsBackups(root).length, 0, 'no backup created');
+    } finally {
+      chmodSync(claudeDir, 0o755);
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }
+);
+
+// F34: the atomic write replaces the inode via rename — without an explicit
+// mode carry-over, a user's chmod 600 settings.json would silently become
+// world-readable after a merge.
+test(
+  'merge preserves a chmod-600 settings.json file mode',
+  { skip: process.platform === 'win32' },
+  () => {
+    const { dir, root, settingsPath } = freshInstall();
+    try {
+      writeFileSync(
+        settingsPath,
+        JSON.stringify(TIME_HOOK_SETTINGS, null, 2) + '\n'
+      );
+      chmodSync(settingsPath, 0o600);
+
+      const res = runJson(['update', '--path', root], 'update mode-600');
+      assert.equal(res.status, 0, `exit 0 (stderr: ${res.stderr})`);
+      assert.equal(res.json.plan.settings_merge[0].action, 'add_safety_net_hook');
+
+      const mode = statSync(settingsPath).mode & 0o777;
+      assert.equal(
+        mode,
+        0o600,
+        `settings.json stays 600 after merge (got ${mode.toString(8)})`
+      );
+      const settings = JSON.parse(readFileSync(settingsPath, 'utf8'));
+      assert.equal(
+        settings.hooks.UserPromptSubmit.length,
+        2,
+        'merge actually happened'
+      );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }
+);
 
 test('already registered via shell-form command string is a no-op', () => {
   const { dir, root, settingsPath } = freshInstall();

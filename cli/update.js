@@ -332,11 +332,17 @@ export async function update(opts) {
     isLegacySchema && plan.unchanged.length > 0;
 
   if (willWrite === 0 && !willMigrateRegistry) {
+    // When the only plan item is a skipped settings merge (e.g. malformed
+    // settings.json), "Already up to date." right after the skip notice reads
+    // as a contradiction — suppress it and let the skip reason stand alone.
+    const mergeSkipped = plan.settings_merge.some(
+      (m) => m.action === 'skipped'
+    );
     return {
       ok: true,
       backup: null,
       plan,
-      message: 'Already up to date.',
+      ...(mergeSkipped ? {} : { message: 'Already up to date.' }),
     };
   }
 
@@ -403,7 +409,21 @@ export async function update(opts) {
   // reason instead of silently no-opping or clobbering.
   for (const item of plan.settings_merge) {
     if (item.action !== 'add_safety_net_hook') continue;
-    const mergeResult = await applySafetyNetMerge(paths.claudeSettings);
+    // An fs failure inside the merge (backup copy or write) must not crash
+    // the run: framework files are already written above, and version.json
+    // is written below — dying here would leave a stale hash registry and
+    // doctor would false-flag every updated file as "modified". Downgrade to
+    // a skipped item carrying the error instead.
+    let mergeResult;
+    try {
+      mergeResult = await applySafetyNetMerge(paths.claudeSettings);
+    } catch (err) {
+      mergeResult = {
+        merged: false,
+        code: 'error',
+        reason: `settings merge failed (${err.message}) — settings.json left as-is. Register the safety-net hook manually, or fix the underlying issue and re-run update.`,
+      };
+    }
     if (mergeResult.merged) {
       item.backup = mergeResult.backup;
     } else {

@@ -199,7 +199,7 @@ Every install includes a small script that checks each message you send for expl
 Honest framing of what it is and isn't:
 
 - **It's a keyword pattern-matcher, not crisis detection.** It can't understand context or assess how you're actually doing. That judgment stays with the AI, guided by the written safety protocol — which remains the primary safety layer. This script is a backstop.
-- **It only matches first-person language.** Talking about someone else ("my brother has been struggling"), processing grief, or discussing something from a book or the news won't trigger it. That's deliberate.
+- **It's scoped toward first-person language.** Talking about someone else ("my brother has been struggling"), processing grief, or discussing something from a book or the news is filtered out — though no keyword filter is perfect. That scoping is deliberate.
 - **English only, for now.** Crisis language in other languages won't trigger it. The written safety protocol still applies regardless of language.
 - **It fails open.** If the script ever hits an error, your session continues normally. A broken safety net never interrupts a conversation.
 

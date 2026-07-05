@@ -228,7 +228,20 @@ export async function install(rawOpts) {
   if (!existsSync(paths.claudeSettings)) {
     await copyFile(packageFile('claude-settings.template.json'), paths.claudeSettings);
   } else {
-    const mergeResult = await applySafetyNetMerge(paths.claudeSettings);
+    // An fs failure inside the merge (backup copy or write) must not crash
+    // the install — everything else about the setup is fine. Downgrade to a
+    // skipped item carrying the error so the run completes and version.json
+    // is still written.
+    let mergeResult;
+    try {
+      mergeResult = await applySafetyNetMerge(paths.claudeSettings);
+    } catch (err) {
+      mergeResult = {
+        merged: false,
+        code: 'error',
+        reason: `settings merge failed (${err.message}) — settings.json left as-is. Register the safety-net hook manually, or fix the underlying issue and run \`inner-dialogue update\`.`,
+      };
+    }
     if (mergeResult.merged) {
       settingsMerge.push({
         path: SETTINGS_REL_PATH,
