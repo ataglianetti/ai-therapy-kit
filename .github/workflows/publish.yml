@@ -17,6 +17,8 @@ on:
       - 'commands.md'
       - 'CLAUDE.template.md'
       - 'profile.template.md'
+      - 'claude-settings.template.json'
+      - 'manifest.json'
       - '.github/workflows/**'
   workflow_dispatch:
 
