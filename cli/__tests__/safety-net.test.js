@@ -268,15 +268,143 @@ test('negatives: enumeration heads do not read as a first-person subject (round-
   assertSilent('act i was so suicidal in tone');
 });
 
+test('tier-1: elided-first-person suicidal thoughts and ideation fire (round-4 F37)', () => {
+  assertFires('these suicidal thoughts wont stop');
+  assertFires('those suicidal thoughts came back');
+  assertFires('constant suicidal thoughts all day');
+  assertFires('suicidal thoughts wont stop');
+  assertFires('suicidal thoughts again tonight');
+  assertFires('recurring suicidal ideation is ruining me');
+  assertFires('cant shake these suicidal thoughts');
+  assertFires('my head is full of suicidal thoughts');
+});
+
+test('tier-1: embedded first-person clauses behind complementizers fire (round-4 F38)', () => {
+  assertFires('i told my mom that i want to die');
+  assertFires('i hate that i want to die');
+  assertFires("i'm scared that i want to die");
+  assertFires('i know that i want to die');
+  assertFires('the truth is that i want to die');
+  assertFires('i told her that i would be better off dead');
+  assertFires('i wrote that i plan to end it');
+  assertFires('i admitted that i wanted to die');
+  assertFires('i realized that i want to die');
+  assertFires('no one knows that i want to die');
+  assertFires("i finally accepted that i'd be better off dead");
+  assertFires('we talked about that\ni want to die');
+});
+
+test('tier-1: metonymy, plan, and IFS-parts constructions fire (round-4 F39)', () => {
+  assertFires('my plan is to end it all');
+  assertFires('the plan is to end it all');
+  assertFires('my goal is to end it all');
+  assertFires('my decision is to end it all');
+  assertFires('my mind wants to end it all');
+  assertFires('my body wants to end it all');
+  assertFires('my head keeps saying to end it all');
+  assertFires('the voices say to end it all');
+  assertFires('my part wanted to die');
+  assertFires('my brain keeps thinking about overdosing');
+});
+
+test('tier-1: means-in-hand statements fire (round-4 F39 addendum)', () => {
+  assertFires('i have the pills to end it all');
+  assertFires('i bought the rope to end it all');
+  assertFires('i wish i had the courage to end it all');
+  assertFires('i found a way to end it all');
+  assertFires('i have a way to end it all now');
+  assertFires('sometimes i get the urge to just end it all');
+  assertFires('the urge to end it all is back');
+  assertFires('i spent the night thinking about overdosing');
+});
+
+test('negatives: third-person det+noun subjects stay silent (round-4 F39)', () => {
+  assertSilent('my brother wants to end it all');
+  assertSilent('my son wants to die');
+});
+
+test('tier-1: first person after everyday nouns fires (round-4 F40)', () => {
+  assertFires('after class i was so suicidal');
+  assertFires('in class i was so suicidal today');
+  assertFires("at this stage i'm honestly suicidal");
+  assertFires('at this stage i am really suicidal');
+  assertFires('at some level i am suicidal');
+  assertFires('during the war i was suicidal');
+  assertFires('last season i was really suicidal');
+  assertFires("in class i've been thinking about suicide");
+  assertFires("since the war i've been thinking about suicide");
+});
+
+test('tier-1: first-person-plural we-forms fire (round-4 F41, PM ruling)', () => {
+  assertFires('we want to die');
+  assertFires("we'd be better off dead");
+});
+
+test('negatives: generic-you venting stays silent (round-4 F41, PM ruling)', () => {
+  assertSilent('sometimes you just want to die');
+  assertSilent("if you're feeling suicidal you should call 988");
+});
+
+test('negatives: third-person adverb chains and contractions stay silent (round-4 F42)', () => {
+  assertSilent('my brother has honestly been suicidal');
+  assertSilent('my daughter is genuinely feeling suicidal');
+  assertSilent('my son has actually been feeling suicidal');
+  assertSilent('she is basically planning to commit suicide');
+  assertSilent("they've been thinking about overdosing");
+  assertSilent('my best friend is attempting suicide');
+  assertSilent('she said she wanna die');
+});
+
+test('tier-1: subjectless thinking-about-suicide fires (round-4 F43)', () => {
+  assertFires('been thinking about suicide a lot');
+  assertFires('thinking about suicide again');
+});
+
+test('negatives: subject-bearing thinking-about-suicide stays silent (round-4 F43)', () => {
+  assertSilent('he is thinking about suicide');
+});
+
+test('negatives: topical take-overdose forms stay silent (round-4 F44)', () => {
+  assertSilent("i'm taking an overdose prevention course");
+  assertSilent('i took an overdose call at work today');
+});
+
+test('tier-1: real take-overdose forms keep firing (round-4 F44)', () => {
+  assertFires('I took an overdose of pills last night');
+  assertFires('I took an overdose');
+});
+
+test('tier-1: self-harm split across space+newline fires (round-4 F46)', () => {
+  assertFires('self \nharm');
+  assertFires('self\n harm');
+  assertFires('i keep thinking about self \n harm');
+  assertFires('self\nharm');
+});
+
+// Extract a word-class declaration from the hook source and return its
+// alternation members as a plain array ("var NAME = 'a|b' + '|c';" → [a,b,c]).
+function wordClass(hookSource, name) {
+  const decl = hookSource.match(new RegExp(`var ${name} =[\\s\\S]*?;`));
+  assert.ok(decl, `${name} declaration found in hook source`);
+  const joined = (decl[0].match(/'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*"/g) || [])
+    .map((s) => s.slice(1, -1))
+    .join('');
+  return joined
+    .replace(/\\\\[a-z]\+?|\(\?:|\)|\{\d+(?:,\d+)?\}/g, '')
+    .split('|')
+    .filter(Boolean);
+}
+
 test('FP_GAP membership guard: dropping a gap word breaks the suite (round-3 F36)', () => {
   // Source-level guard: every closed-class gap word the matcher depends on
-  // must stay in the FP_GAP alternation. A behavioral phrase per family
-  // lives in the F27/F28 tests; this catches a silently dropped word.
+  // must stay reachable through the FP_GAP composite (fillers + the shared
+  // ADVERBS class). A behavioral phrase per family lives in the F27/F28
+  // tests; this catches a silently dropped word.
   const hookSource = readFileSync(HOOK_PATH, 'utf8');
-  const decl = hookSource.match(/var FP_GAP =[\s\S]*?;/);
-  assert.ok(decl, 'FP_GAP declaration found in hook source');
-  // Flatten the concatenated string literals into one alternation body.
-  const flat = decl[0].replace(/["'+\s]/g, '');
+  const gapWords = new Set([
+    ...wordClass(hookSource, 'FP_GAP_FILLERS'),
+    ...wordClass(hookSource, 'ADVERBS')
+  ]);
   const required = [
     // auxiliaries / progressives
     'am', 'been', 'being', 'have', 'having', 'feel', 'feeling', 'keep',
@@ -292,12 +420,49 @@ test('FP_GAP membership guard: dropping a gap word breaks the suite (round-3 F36
     'really', 'lowkey', 'low-key', 'hella'
   ];
   for (const word of required) {
-    assert.ok(
-      flat.includes(`|${word}|`) ||
-        flat.includes(`|${word})`) ||
-        flat.includes(`:${word}|`),
-      `FP_GAP is missing gap word: ${word}`
-    );
+    assert.ok(gapWords.has(word), `FP_GAP is missing gap word: ${word}`);
+  }
+});
+
+test('word-class drift guard: shared adverbs, SL_HEAD subset, chain exclusions (round-4 F45)', () => {
+  const hookSource = readFileSync(HOOK_PATH, 'utf8');
+
+  // Both grammars must consume the single shared ADVERBS constant — the
+  // drift this prevents is an adverb landing in one class but not the
+  // other ("i'm honestly suicidal" firing while "my brother has honestly
+  // been suicidal" also fires).
+  const fpGapDecl = hookSource.match(/var FP_GAP =[\s\S]*?;/);
+  const tpChainDecl = hookSource.match(/var TP_CHAIN =[\s\S]*?;/);
+  assert.ok(fpGapDecl && /\bADVERBS\b/.test(fpGapDecl[0]), 'FP_GAP consumes ADVERBS');
+  assert.ok(tpChainDecl && /\bADVERBS\b/.test(tpChainDecl[0]), 'TP_CHAIN consumes ADVERBS');
+
+  // Every subjectless head must be absorbable as a first-person gap filler
+  // ("i have been feeling suicidal" needs FP_GAP to cross what SL_HEAD
+  // anchors on when the subject is present).
+  const gapWords = new Set([
+    ...wordClass(hookSource, 'FP_GAP_FILLERS'),
+    ...wordClass(hookSource, 'ADVERBS')
+  ]);
+  for (const head of wordClass(hookSource, 'SL_HEAD')) {
+    assert.ok(gapWords.has(head), `SL_HEAD word not in FP_GAP classes: ${head}`);
+  }
+
+  // The third-person chain must never absorb a first-person token — that
+  // is the invariant that lets "she knows i want to die" keep firing. And
+  // per the recorded F41 ruling, first-person-plural we-forms fire, so no
+  // we-form may appear in the chain or the pronoun class.
+  const chainWords = new Set([
+    ...wordClass(hookSource, 'TP_CHAIN_LINKS'),
+    ...wordClass(hookSource, 'ADVERBS')
+  ]);
+  const pronWords = new Set(wordClass(hookSource, 'TP_PRON'));
+  const firstPerson = [
+    'i', "i'm", "i've", "i'd", "i'll", 'im', 'ive', 'me', 'my', 'myself',
+    'we', "we're", "we'd", "we've", "we'll"
+  ];
+  for (const token of firstPerson) {
+    assert.ok(!chainWords.has(token), `TP_CHAIN must not absorb: ${token}`);
+    assert.ok(!pronWords.has(token), `TP_PRON must not include: ${token}`);
   }
 });
 
@@ -407,12 +572,24 @@ test('fail-open: ~2MB benign prompt exits 0 silently', () => {
   assert.equal(stdout, '');
 });
 
-test('fail-open: oversized stdin payload exits 0 silently (round-2 F25)', () => {
-  // Past the stdin buffer bound the hook stops accumulating and treats the
-  // payload as no-match, even when it contains crisis language — a
-  // pathological payload must never OOM into a nonzero exit.
+test('oversized stdin: crisis language in the first 4MB still fires (round-4 F45)', () => {
+  // Past the stdin buffer bound the hook stops accumulating but scans the
+  // retained prefix raw (truncated JSON can't parse) — crisis language
+  // early in a pathological payload is not discarded with the overflow.
   const big = JSON.stringify({
     prompt: 'I want to die ' + 'a'.repeat(5 * 1024 * 1024)
+  });
+  const { status, stdout } = runHook(big);
+  assert.equal(status, 0);
+  const parsed = parseEnvelope(stdout, 'oversized crisis-early');
+  assert.ok(parsed.hookSpecificOutput.additionalContext.includes('988'));
+});
+
+test('fail-open: crisis language past the 4MB bound exits 0 silently (round-2 F25 / round-4 F45)', () => {
+  // Beyond the bound the payload is treated as no-match — memory stays
+  // bounded and the exit is 0 no matter how large the payload grows.
+  const big = JSON.stringify({
+    prompt: 'a'.repeat(5 * 1024 * 1024) + ' I want to die'
   });
   const { status, stdout } = runHook(big);
   assert.equal(status, 0);
@@ -525,10 +702,10 @@ test('pattern hygiene: every pattern source is lowercase (round-1 F14)', () => {
   // The hook lowercases input before matching (normalize-then-match), so an
   // uppercase character in any pattern can never match. Guard the
   // convention across both regex literals and the string-composed
-  // first-person patterns (FP_HEAD / FP_GAP / fp() tails, round-2).
+  // first-person patterns (ADVERBS / FP_HEAD / FP_GAP / fp() tails).
   const hookSource = readFileSync(HOOK_PATH, 'utf8');
   const m = hookSource.match(
-    /var FP_HEAD[\s\S]*?var TIER2_PATTERNS = \[[\s\S]*?\];/
+    /var ADVERBS[\s\S]*?var TIER2_PATTERNS = \[[\s\S]*?\];/
   );
   assert.ok(m, 'pattern definition region found in hook source');
   // Strip whole-line comments so prose casing does not trip the check.

@@ -31,8 +31,9 @@
 //
 // Fail-open contract: on ANY error (malformed JSON, empty stdin, missing
 // or non-string prompt, closed stdout, stdin that never ends, a sync throw
-// during stdio setup, a pathological oversized payload), exit 0 with no
-// output. A broken hook must never break a session.
+// during stdio setup), exit 0 with no output. Oversized payloads are
+// bounded, not fatal: the first 4MB is retained and scanned raw, the rest
+// is treated as no-match. A broken hook must never break a session.
 //
 // Pattern convention: input is normalized (lowercased, unicode punctuation
 // folded, whitespace collapsed) before matching, so every pattern source
@@ -40,61 +41,103 @@
 
 'use strict';
 
+// --- Shared word classes (round-4 F45 structural) -------------------------
+// One adverb/intensifier class is consumed by BOTH the first-person gap
+// (FP_GAP) and the third-person chain (TP_CHAIN). The two grammars kept
+// drifting apart when maintained as separate inline lists ("i'm honestly
+// suicidal" fired while "my brother has honestly been suicidal" also fired
+// because only one list knew "honestly"). A drift-guard test asserts both
+// composites reference this constant and that SL_HEAD stays a subset of the
+// FP_GAP filler class.
+var ADVERBS =
+  'so|very|really|extremely|incredibly|pretty|honestly|genuinely' +
+  '|seriously|truly|literally|actually|basically|apparently|just|still' +
+  '|also|too|often|always|constantly|sometimes|occasionally|usually' +
+  '|never|ever|kinda|lately|recently|again|now|almost|even|fucking' +
+  '|freaking|goddamn|damn|completely|totally|deeply|dangerously|quite' +
+  '|super|real|lowkey|low-key|hella';
+
 // First-person anchor + bounded filler gap. Crisis keywords composed with
 // fp() fire only when an explicit first-person subject precedes them,
 // separated by at most six words from a closed class of auxiliaries,
-// modals, volitional verbs, and intensifiers. Any other intervening word
-// (a name, "my brother", "she", "people who") breaks the anchor and the
-// pattern stays silent. The lookbehind keeps enumeration heads ("chapter
-// i", "act i") from reading the roman numeral as a first-person subject.
+// modals, volitional verbs, and the shared adverbs. Any other intervening
+// word (a name, "my brother", "she", "people who") breaks the anchor and
+// the pattern stays silent. The enumeration lookbehind keeps true
+// enumeration heads ("chapter i", "act i") from reading the roman numeral
+// as a first-person subject — it applies ONLY to bare "i": contractions
+// ("i'm", "i've") can never be roman numerals, and everyday nouns that
+// merely can take numbering (class, war, stage, level, season) are not in
+// the list, so "after class i was so suicidal" fires (round-4 F40).
 var FP_HEAD =
-  "(?<!\\b(?:chapter|act|section|part|volume|book|phase|article|appendix" +
-  '|scene|episode|season|stage|level|title|figure|table|exhibit|schedule' +
-  "|grade|type|class|war)\\s)\\bi(?:'m|'ve|'d|'ll|m|ve)?";
-var FP_GAP =
-  "(?:\\s+(?:am|are|was|be|been|being|has|have|having|had|feel|feels|felt" +
+  "\\b(?:i(?:'m|'ve|'d|'ll|m|ve)|(?<!\\b(?:chapter|act|section|appendix" +
+  '|exhibit|figure|table|volume|phase)\\s)i)';
+var FP_GAP_FILLERS =
+  'am|are|was|be|been|being|has|have|having|had|feel|feels|felt' +
   '|feeling|keep|keeps|kept|get|gets|got|getting|gotten|start|started' +
   "|starting|stop|stopped|can't|cant|cannot|couldn't|couldnt|won't|wont" +
   "|will|would|wouldn't|wouldnt|might|may|could|should|must|want|wanted" +
   '|wanting|wanna|need|needed|gonna|going|about|of|to|think|thinking' +
-  '|thought|like|so|very|really|extremely|incredibly|pretty|honestly' +
-  '|genuinely|seriously|truly|literally|actually|just|still|often|always' +
-  '|constantly|sometimes|occasionally|usually|never|ever|this|that|too' +
-  '|a|an|kinda|lately|recently|again|almost|tried|try|trying|plan|plans' +
-  '|planned|planning|decided|decide|intend|hoping|hope|take|took|taking' +
-  '|taken|fucking|freaking|goddamn|damn|completely|totally|deeply' +
-  '|dangerously|quite|super|real|lowkey|low-key|hella)){0,6}';
+  '|thought|like|this|that|a|an|tried|try|trying|plan|plans|planned' +
+  '|planning|decided|decide|intend|hoping|hope|take|took|taking|taken';
+var FP_GAP = '(?:\\s+(?:' + FP_GAP_FILLERS + '|' + ADVERBS + ')){0,6}';
 
 function fp(tail) {
   return new RegExp(FP_HEAD + FP_GAP + '\\s+' + tail);
 }
 
 // Third-person anti-anchor for subjectless and bare-gerund patterns: a
-// negative lookbehind that goes silent when a third-person subject (a
-// pronoun, or a determiner + one noun) plus a closed chain of verbs,
-// modals, and adverbs immediately precedes the match ("my friend is
-// attempting suicide", "she said she would be better off dead"). The
-// chain class deliberately excludes first-person tokens ("i", "i've") and
-// conjunctions, so "my mom died and i want to die" and "she knows i want
-// to die" keep firing — the chain breaks and the anchor survives.
+// negative lookbehind that goes silent when a third-person subject plus a
+// closed chain of verbs, modals, and the shared adverbs immediately
+// precedes the match ("my friend is attempting suicide", "she said she
+// would be better off dead"). The chain class deliberately excludes
+// first-person tokens ("i", "i've") and conjunctions, so "my mom died and
+// i want to die" and "she knows i want to die" keep firing — the chain
+// breaks and the anchor survives.
+//
+// Two branches:
+//  - pronoun subjects (he/she/they/you/it...). First-person plural "we"
+//    forms are NOT here: per the recorded PM ruling (F41, 2026-07-05),
+//    "we want to die" fires; generic-you stays silent.
+//  - determiner + noun subjects ("my brother", "the article"). This branch
+//    only blocks when NO first-person token appears earlier in the same
+//    clause (round-4 F38/F39): a det+noun inside a first-person clause is
+//    an object, not a subject — "i have the pills to end it all", "i told
+//    my mom that i want to die" fire, while "my brother wants to end it
+//    all" stays silent. The noun slot additionally excludes bare
+//    first-person tokens ("that i want to die") and self-reference nouns
+//    (plan/mind/part/voices/urge...), which are the speaker's own state,
+//    not a third person ("my plan is to end it all", IFS parts language).
+//    The clause scan is bounded (80 chars back to a clause boundary) so
+//    matching stays linear on adversarial input.
 var TP_PRON =
-  "(?:he|she|they|we|you|it|who|he's|she's|it's|they're|we're|you're" +
-  "|he'd|she'd|they'd|we'd|you'd)";
-var TP_CHAIN =
-  '(?:\\s+(?:is|are|was|were|be|been|being|has|have|had|says|said|say' +
+  "(?:he|she|they|you|it|who|he's|she's|it's|they're|you're" +
+  "|he'd|she'd|they'd|you'd|they've|you've|he'll|she'll|they'll|you'll" +
+  "|it'll)";
+var TP_CHAIN_LINKS =
+  'is|are|was|were|be|been|being|has|have|having|had|says|said|say' +
   '|saying|keeps|keep|kept|wants|want|wanted|wanting|feels|feel|felt' +
   '|feeling|thinks|think|thought|thinking|talks|talk|talked|talking' +
   '|seems|seem|seemed|described|discussed|mentioned|admitted|would|will' +
   "|might|may|could|should|must|can't|cant|won't|wont|wouldn't|wouldnt" +
-  '|to|about|of|that|still|also|just|really|so|very|often|always|never' +
-  '|ever|sometimes|constantly|recently|lately|apparently|even|again|now' +
-  '|he|she|they|it|we|you|her|him|them|his|their)){0,5}';
+  '|to|about|of|that|he|she|they|it|you|her|him|them|his|their';
+var TP_CHAIN = '(?:\\s+(?:' + TP_CHAIN_LINKS + '|' + ADVERBS + ')){0,5}';
+var TP_DET = '(?:my|his|her|their|your|our|the|this|that|a|an)';
+var SELF_NOUNS =
+  'plan|plans|goal|goals|decision|decisions|mind|brain|head|heart|body' +
+  '|soul|gut|part|parts|voice|voices|urge|urges';
+var TP_NOUN = "(?!(?:i|i'[a-z]+|" + SELF_NOUNS + ")\\b)[a-z']+";
 var TP_BLOCK =
   '(?<!\\b' +
   TP_PRON +
   TP_CHAIN +
-  '\\s)(?<!\\b(?:my|his|her|their|your|our|the|this|that|a|an)' +
-  "\\s+[a-z']+" +
+  '\\s)' +
+  '(?<!(?:^|[.!?\\n;])(?:(?!\\bi\\b)[^.!?\\n;]){0,80}?\\b' +
+  TP_DET +
+  '\\s+' +
+  TP_NOUN +
+  '(?:\\s+' +
+  TP_NOUN +
+  ')?' +
   TP_CHAIN +
   '\\s)';
 
@@ -119,7 +162,7 @@ function tp(source) {
 // Recall-first: within clearly first-person crisis space, prefer to match.
 var TIER1_PATTERNS = [
   tp('\\bwant(?:ed)?\\s+to\\s+die\\b'),
-  /\bwanna\s+die\b/,
+  tp('\\bwanna\\s+die\\b'),
   /\bwish\s+i\s+(?:was|were)\s+dead\b/,
   /\bwish\s+i\s+(?:wasn'?t|weren'?t|was\s+not|were\s+not)\s+alive\b/,
   /\bk[i1!]ll(?:ing|ed)?\s+myself\b/,
@@ -153,17 +196,38 @@ var TIER1_PATTERNS = [
   /\bsh(?:oot|ooting|ot)\s+myself\b(?!\s+in\s+the\s+foot)/,
   /\b(?:to|gonna|might|could|should|would|wanna|will|i'?ll|i)\s+(?:just\s+)?off\s+myself\b/,
   /\boffing\s+myself\b/,
-  /\bself[-\s]?harm(?!\s+(?:awareness|prevention)\b)/,
+  // The separator width tracks normalize(): newlines survive as clause
+  // boundaries, so "self \nharm" / "self\n harm" leave up to three
+  // whitespace chars between the halves (round-4 F46).
+  /\bself[-\s]{1,3}harm(?!\s+(?:awareness|prevention)\b)/,
   fp('suicidal\\b'),
   sl('suicidal\\b'),
-  /\b(?:my|the)\s+suicidal\s+(?:thoughts?|ideation)\b/,
+  // Anti-anchored, not allowlisted (round-4 F37): elided-first-person
+  // determiners ("these/those/constant suicidal thoughts", bare "suicidal
+  // thoughts wont stop") fire; explicit third-person possessives and
+  // subject chains ("his suicidal thoughts", "my son has suicidal
+  // thoughts") and topical "patients with suicidal ideation" stay silent.
+  new RegExp(
+    TP_BLOCK +
+      "(?<!\\b(?:his|her|their|your)\\s)(?<!\\bwith\\s)" +
+      '\\bsuicidal\\s+(?:thoughts?|ideation)\\b'
+  ),
   fp('th(?:ink(?:ing)?|ought)\\s+(?:about|of)\\s+suicide\\b'),
+  // Subjectless thinking-about-suicide, anchored to the start of a clause
+  // where the dropped subject reads as elided first person (round-4 F43:
+  // "been thinking about suicide a lot", "thinking about suicide again").
+  // Mid-clause gerunds keep their subject ("he is thinking about suicide",
+  // "an article about teens thinking about suicide") and stay silent.
+  /(?:^|[.!?\n;])\s*(?:been\s+)?th(?:ink(?:ing)?|ought)\s+(?:about|of)\s+suicide\b/,
   fp('commit(?:ted|ting)?\\s+suicide\\b'),
   sl('commit(?:ted|ting)?\\s+suicide\\b'),
   fp('attempt(?:ed|ing)?\\s+suicide\\b'),
   tp('\\battempting\\s+suicide\\b'),
-  fp('overdos(?:e|ed|ing)\\b'),
-  sl('overdos(?:e|ed|ing)\\b'),
+  // The topical-suffix guard mirrors the self-harm awareness/prevention
+  // guard (round-4 F44): "taking an overdose prevention course" / "took an
+  // overdose call at work" are professional/topical, not crisis.
+  fp('overdos(?:e|ed|ing)\\b(?!\\s+(?:prevention|awareness|call|calls)\\b)'),
+  sl('overdos(?:e|ed|ing)\\b(?!\\s+(?:prevention|awareness|call|calls)\\b)'),
   tp('\\bthink(?:ing)?\\s+(?:about|of)\\s+overdosing\\b'),
   /\bmy\s+suicide\s+(?:note|plan|attempt)\b/,
   tp('\\bplan(?:ning|ned)?\\s+to\\s+(?:die|kill|end\\s+(?:it|my\\s+life))\\b'),
@@ -233,9 +297,11 @@ if (envTimeout > 0) {
 }
 
 // Bound the stdin buffer: past this many characters the hook stops
-// accumulating and treats the payload as no-match, so a pathological
-// payload can never OOM into a nonzero exit. Real prompts are orders of
-// magnitude smaller.
+// accumulating, so a pathological payload can never OOM into a nonzero
+// exit. The retained prefix is still scanned (raw, since truncated JSON
+// can't parse) — crisis language in the first 4MB of an oversized payload
+// fires; anything past the bound is treated as no-match. Real prompts are
+// orders of magnitude smaller.
 var MAX_STDIN_CHARS = 4 * 1024 * 1024;
 
 function normalize(text) {
@@ -257,38 +323,45 @@ function matchesAny(patterns, text) {
   return false;
 }
 
+function emitNotice() {
+  var out =
+    JSON.stringify({
+      hookSpecificOutput: {
+        hookEventName: 'UserPromptSubmit',
+        additionalContext: ADDITIONAL_CONTEXT
+      }
+    }) + '\n';
+  // A never-draining stdout must not leave the process hangable: keep a
+  // live (ref'd) timer armed until the write callback fires, then let
+  // the loop drain to a natural exit 0. If the pipe never drains, the
+  // timer exits 0 after TIMEOUT_MS. The stdout 'error' handler below
+  // covers EPIPE, and the write callback still fires on error, clearing
+  // the timer.
+  var flushTimer = setTimeout(function () {
+    process.exit(0);
+  }, TIMEOUT_MS);
+  try {
+    process.stdout.write(out, function () {
+      clearTimeout(flushTimer);
+    });
+  } catch (err) {
+    clearTimeout(flushTimer);
+  }
+}
+
+function scanAndEmit(text) {
+  if (matchesAny(TIER1_PATTERNS, text) || matchesAny(TIER2_PATTERNS, text)) {
+    emitNotice();
+  }
+}
+
 function main(input) {
   var payload = JSON.parse(input);
   var prompt = payload && payload.prompt;
   if (typeof prompt !== 'string' || prompt.length === 0) {
     return;
   }
-  var text = normalize(prompt);
-  if (matchesAny(TIER1_PATTERNS, text) || matchesAny(TIER2_PATTERNS, text)) {
-    var out =
-      JSON.stringify({
-        hookSpecificOutput: {
-          hookEventName: 'UserPromptSubmit',
-          additionalContext: ADDITIONAL_CONTEXT
-        }
-      }) + '\n';
-    // A never-draining stdout must not leave the process hangable: keep a
-    // live (ref'd) timer armed until the write callback fires, then let
-    // the loop drain to a natural exit 0. If the pipe never drains, the
-    // timer exits 0 after TIMEOUT_MS. The stdout 'error' handler below
-    // covers EPIPE, and the write callback still fires on error, clearing
-    // the timer.
-    var flushTimer = setTimeout(function () {
-      process.exit(0);
-    }, TIMEOUT_MS);
-    try {
-      process.stdout.write(out, function () {
-        clearTimeout(flushTimer);
-      });
-    } catch (err) {
-      clearTimeout(flushTimer);
-    }
-  }
+  scanAndEmit(normalize(prompt));
 }
 
 // Runtime wiring. Wrapped so that ANY synchronous throw during stdio setup
@@ -314,20 +387,26 @@ try {
     if (overflowed) return;
     received += chunk.length;
     if (received > MAX_STDIN_CHARS) {
+      // Keep the prefix up to the bound and stop accumulating: the
+      // retained text is still scanned on end (recall-first), while memory
+      // stays bounded no matter how large the payload grows.
       overflowed = true;
-      chunks = [];
+      chunks.push(chunk.slice(0, chunk.length - (received - MAX_STDIN_CHARS)));
       return;
     }
     chunks.push(chunk);
   });
   process.stdin.on('end', function () {
     clearTimeout(stdinTimer);
-    if (overflowed) {
-      // Pathological payload: treat as no-match and exit 0 naturally.
-      return;
-    }
     try {
-      main(chunks.join(''));
+      if (overflowed) {
+        // Oversized payload: the truncated input can't JSON.parse, so scan
+        // the retained raw prefix directly. Crisis language early in a
+        // pathological payload still fires; past the bound is no-match.
+        scanAndEmit(normalize(chunks.join('')));
+      } else {
+        main(chunks.join(''));
+      }
     } catch (err) {
       // Fail-open: swallow and fall through to a natural exit 0.
     }
