@@ -19,7 +19,13 @@ import {
 import os from 'node:os';
 import path from 'node:path';
 
-import { parseSettingsForMerge, writeFileAtomic } from '../lib/settings.js';
+import { execSync } from 'node:child_process';
+
+import {
+  applySafetyNetMerge,
+  parseSettingsForMerge,
+  writeFileAtomic,
+} from '../lib/settings.js';
 
 // ---------------------------------------------------------------------------
 // parseSettingsForMerge: bad_shape reasons name the actually-bad key
@@ -147,6 +153,78 @@ test('creates a new file with default mode when the target does not exist', asyn
     assert.equal(readFileSync(target, 'utf8'), '{"fresh": true}\n');
     assert.deepEqual(readdirSync(dir), ['settings.json'], 'no temp leftovers');
   } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// applySafetyNetMerge: fail-soft contract (round-4 F45)
+// ---------------------------------------------------------------------------
+
+test('merge fail-soft: fs failure returns code "error" instead of throwing', {
+  skip: process.platform === 'win32',
+}, async () => {
+  // Read-only directory: the pre-merge backup copy fails. The merge must
+  // come back as { merged: false, code: 'error' } — never a rejection — and
+  // leave settings.json untouched.
+  const dir = tempDir();
+  const target = path.join(dir, 'settings.json');
+  try {
+    writeFileSync(target, '{}\n');
+    chmodSync(dir, 0o555);
+
+    const result = await applySafetyNetMerge(target);
+
+    chmodSync(dir, 0o755);
+    assert.equal(result.merged, false);
+    assert.equal(result.code, 'error');
+    assert.match(result.reason, /settings merge failed/);
+    assert.doesNotMatch(
+      result.reason,
+      /backup was saved/,
+      'no backup path claimed when the backup itself failed'
+    );
+    assert.equal(readFileSync(target, 'utf8'), '{}\n', 'target untouched');
+  } finally {
+    chmodSync(dir, 0o755);
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('merge fail-soft: reason names the backup when the write fails after it', {
+  skip: process.platform !== 'darwin',
+}, async () => {
+  // darwin-only: chflags uchg makes the target immutable, so the backup
+  // copy succeeds but the atomic rename fails — the orphaned snapshot must
+  // be named in the skip reason rather than left behind silently.
+  const dir = tempDir();
+  const target = path.join(dir, 'settings.json');
+  try {
+    writeFileSync(target, '{}\n');
+    execSync(`chflags uchg ${JSON.stringify(target)}`);
+
+    const result = await applySafetyNetMerge(target);
+
+    execSync(`chflags nouchg ${JSON.stringify(target)}`);
+    assert.equal(result.merged, false);
+    assert.equal(result.code, 'error');
+    assert.match(result.reason, /settings merge failed/);
+    assert.match(
+      result.reason,
+      /A pre-merge backup was saved at .*settings\.json\.bak-/,
+      'orphaned backup path surfaced in the reason'
+    );
+    assert.equal(readFileSync(target, 'utf8'), '{}\n', 'target untouched');
+    assert.ok(
+      !readdirSync(dir).some((f) => f.startsWith('.settings.json.tmp-')),
+      'no temp leftovers'
+    );
+  } finally {
+    try {
+      execSync(`chflags nouchg ${JSON.stringify(target)}`);
+    } catch {
+      // already cleared
+    }
     rmSync(dir, { recursive: true, force: true });
   }
 });

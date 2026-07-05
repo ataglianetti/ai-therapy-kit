@@ -409,21 +409,12 @@ export async function update(opts) {
   // reason instead of silently no-opping or clobbering.
   for (const item of plan.settings_merge) {
     if (item.action !== 'add_safety_net_hook') continue;
-    // An fs failure inside the merge (backup copy or write) must not crash
-    // the run: framework files are already written above, and version.json
-    // is written below — dying here would leave a stale hash registry and
-    // doctor would false-flag every updated file as "modified". Downgrade to
-    // a skipped item carrying the error instead.
-    let mergeResult;
-    try {
-      mergeResult = await applySafetyNetMerge(paths.claudeSettings);
-    } catch (err) {
-      mergeResult = {
-        merged: false,
-        code: 'error',
-        reason: `settings merge failed (${err.message}) — settings.json left as-is. Register the safety-net hook manually, or fix the underlying issue and re-run update.`,
-      };
-    }
+    // applySafetyNetMerge is fail-soft: an fs failure inside the merge comes
+    // back as { merged: false, code: 'error', reason } rather than throwing,
+    // so the run completes (framework files are already written above and
+    // version.json is written below — a crash here would leave a stale hash
+    // registry and doctor would false-flag every updated file as "modified").
+    const mergeResult = await applySafetyNetMerge(paths.claudeSettings);
     if (mergeResult.merged) {
       item.backup = mergeResult.backup;
     } else {

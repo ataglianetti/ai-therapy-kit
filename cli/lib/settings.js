@@ -139,35 +139,57 @@ export async function planSafetyNetMerge(settingsPath) {
 // dropping anything else, and writes atomically (temp file in the same
 // directory + rename) so a mid-write crash can't corrupt settings.json.
 // Returns { merged: true, backup } or { merged: false, code, reason }.
+//
+// Fail-soft: this function never throws. An fs error anywhere in the merge
+// (read, backup copy, atomic write) comes back as { merged: false, code:
+// 'error', reason } — install and update both treat the merge as
+// best-effort, and a crash here would strand a run whose framework writes
+// already landed (stale hash registry, doctor false-flags). If the failure
+// happened after the backup was taken, the reason names the backup path so
+// the snapshot is never orphaned silently.
 export async function applySafetyNetMerge(settingsPath) {
-  if (!existsSync(settingsPath)) {
+  let backup = null;
+  try {
+    if (!existsSync(settingsPath)) {
+      return {
+        merged: false,
+        code: 'missing',
+        reason: 'settings.json no longer exists — merge skipped.',
+      };
+    }
+    const parsed = parseSettingsForMerge(await readFile(settingsPath, 'utf8'));
+    if (!parsed.ok) {
+      return { merged: false, code: parsed.code, reason: parsed.reason };
+    }
+    if (hasSafetyNetHook(parsed.settings)) {
+      return {
+        merged: false,
+        code: 'already_registered',
+        reason: 'safety-net hook already registered.',
+      };
+    }
+    backup = await snapshotFile(settingsPath);
+    const settings = parsed.settings;
+    settings.hooks = settings.hooks || {};
+    settings.hooks.UserPromptSubmit = settings.hooks.UserPromptSubmit || [];
+    settings.hooks.UserPromptSubmit.push(safetyNetHookEntry());
+    await writeFileAtomic(
+      settingsPath,
+      JSON.stringify(settings, null, 2) + '\n'
+    );
+    return { merged: true, backup };
+  } catch (err) {
+    const detail = err && err.message ? err.message : String(err);
     return {
       merged: false,
-      code: 'missing',
-      reason: 'settings.json no longer exists — merge skipped.',
+      code: 'error',
+      reason:
+        `settings merge failed (${detail}) — settings.json left as-is.` +
+        (backup ? ` A pre-merge backup was saved at ${backup}.` : '') +
+        ' Register the safety-net hook manually, or fix the underlying' +
+        ' issue and re-run update.',
     };
   }
-  const parsed = parseSettingsForMerge(await readFile(settingsPath, 'utf8'));
-  if (!parsed.ok) {
-    return { merged: false, code: parsed.code, reason: parsed.reason };
-  }
-  if (hasSafetyNetHook(parsed.settings)) {
-    return {
-      merged: false,
-      code: 'already_registered',
-      reason: 'safety-net hook already registered.',
-    };
-  }
-  const backup = await snapshotFile(settingsPath);
-  const settings = parsed.settings;
-  settings.hooks = settings.hooks || {};
-  settings.hooks.UserPromptSubmit = settings.hooks.UserPromptSubmit || [];
-  settings.hooks.UserPromptSubmit.push(safetyNetHookEntry());
-  await writeFileAtomic(
-    settingsPath,
-    JSON.stringify(settings, null, 2) + '\n'
-  );
-  return { merged: true, backup };
 }
 
 // Exported for direct testing (temp-file cleanup and mode preservation are
@@ -187,7 +209,15 @@ export async function writeFileAtomic(target, content) {
     `.${basename(target)}.tmp-${process.pid}-${randomBytes(4).toString('hex')}`
   );
   try {
-    await writeFile(tmp, content, 'utf8');
+    // Create the temp file with the preserved mode from the start (writeFile
+    // mode applies at creation, umask-masked) so a 600 settings.json never
+    // sits world-readable in the window before the chmod; the explicit chmod
+    // still runs to clear whatever bits the umask stripped.
+    await writeFile(
+      tmp,
+      content,
+      mode !== null ? { encoding: 'utf8', mode } : 'utf8'
+    );
     if (mode !== null) await chmod(tmp, mode);
     await rename(tmp, target);
   } catch (err) {
