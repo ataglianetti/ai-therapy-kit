@@ -175,9 +175,11 @@ export async function doctor(opts) {
   let claudeSettings = null;
   let settingsMalformed = false;
   if (existsSync(paths.claudeSettings)) {
+    // Read once: parse for the safety-net registration checks below, and
+    // scan the raw text for the legacy time-hook command.
+    const settingsContent = await readFile(paths.claudeSettings, 'utf8');
     try {
-      claudeSettings = JSON.parse(await readFile(paths.claudeSettings, 'utf8'));
-      ok.push('.claude/settings.json present');
+      claudeSettings = JSON.parse(settingsContent);
     } catch (err) {
       // Malformed settings is its own problem — don't report the file as
       // plainly "present" ok, and don't prescribe `update` as the fix:
@@ -186,6 +188,19 @@ export async function doctor(opts) {
       warnings.push(
         `.claude/settings.json exists but is not valid JSON (${err.message}) — safety-net hook registration can't be verified, and updates will leave the file untouched rather than risk clobbering it. Fix the JSON syntax by hand (or restore from a .claude/settings.json.bak-* backup if one exists).`
       );
+    }
+    if (!settingsMalformed) {
+      // Pre-2.9 scaffolds used the POSIX `date` command for the time hook. On
+      // Windows, cmd.exe's `date` prompts to change the system date instead of
+      // printing it, so the hook hangs or breaks. The template is scaffold_only
+      // (never overwritten by update), so existing installs need a manual fix.
+      if (/"command"\s*:\s*"date /.test(settingsContent)) {
+        warnings.push(
+          ".claude/settings.json uses the legacy shell `date` command for the time hook — it is Mac-only and breaks on Windows. If you haven't customized this file, delete it and run `inner-dialogue update` to re-scaffold the cross-platform (Node) version."
+        );
+      } else {
+        ok.push('.claude/settings.json present');
+      }
     }
   } else {
     warnings.push(
