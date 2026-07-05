@@ -144,6 +144,13 @@ test('merge appends exec-form entry, preserves existing content, snapshots first
       1,
       'backup holds pre-merge content'
     );
+
+    // F19: the merge writes via temp-file + rename. Nothing but the settings
+    // file and its backup may remain in .claude/ — no stray temp files.
+    const leftovers = readdirSync(path.join(root, '.claude')).filter(
+      (n) => n !== 'settings.json' && !n.startsWith('settings.json.bak-')
+    );
+    assert.deepEqual(leftovers, [], 'no stray temp files left in .claude/');
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -231,6 +238,56 @@ test('--dry-run reports the merge without writing', () => {
       'file unchanged after dry run'
     );
     assert.equal(settingsBackups(root).length, 0, 'no backup created');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// F22: the merge must be visible in the human-readable (non---json) output —
+// action taken and backup location, or the skip reason.
+test('human output surfaces the merge with its backup path', () => {
+  const { dir, root, settingsPath } = freshInstall();
+  try {
+    writeFileSync(
+      settingsPath,
+      JSON.stringify(TIME_HOOK_SETTINGS, null, 2) + '\n'
+    );
+
+    const result = spawnSync('node', [CLI_PATH, 'update', '--path', root], {
+      encoding: 'utf8',
+      timeout: 120_000,
+    });
+    assert.equal(result.status, 0, `exit 0 (stderr: ${result.stderr})`);
+    assert.ok(
+      result.stdout.includes(
+        'Registered the safety-net hook in .claude/settings.json'
+      ),
+      `merge line printed\nstdout: ${result.stdout}`
+    );
+    assert.ok(
+      /Backup: .*settings\.json\.bak-/.test(result.stdout),
+      `backup path printed\nstdout: ${result.stdout}`
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('human output surfaces a skipped merge with its reason', () => {
+  const { dir, root, settingsPath } = freshInstall();
+  try {
+    writeFileSync(settingsPath, '{ this is not json');
+
+    const result = spawnSync('node', [CLI_PATH, 'update', '--path', root], {
+      encoding: 'utf8',
+      timeout: 120_000,
+    });
+    assert.equal(result.status, 0, `exit 0 (stderr: ${result.stderr})`);
+    assert.ok(
+      result.stdout.includes('Skipped .claude/settings.json:') &&
+        result.stdout.includes('not valid JSON'),
+      `skip line with reason printed\nstdout: ${result.stdout}`
+    );
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

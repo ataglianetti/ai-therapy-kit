@@ -3,6 +3,8 @@ import { existsSync } from 'node:fs';
 
 import { therapyPaths } from './lib/paths.js';
 import { readVersionJson } from './lib/version.js';
+import { hashFile } from './lib/hash.js';
+import { hasSafetyNetHook } from './lib/settings.js';
 
 // Minimal seed sections. Profiles are expected to evolve beyond these — the
 // LLM is instructed to add H2s as themes emerge and reorganize around active
@@ -42,34 +44,6 @@ function checkProfileStructure(content) {
   }
 
   return { errors, warnings };
-}
-
-// The safety-net hook is registered under hooks.UserPromptSubmit[].hooks[] as
-// either exec form ({command: "node", args: [".../safety-net.js"]}) or a shell
-// command string containing the script path. Match both.
-function hasSafetyNetRegistration(settings) {
-  const groups = settings?.hooks?.UserPromptSubmit;
-  if (!Array.isArray(groups)) return false;
-  for (const group of groups) {
-    if (!Array.isArray(group?.hooks)) continue;
-    for (const hook of group.hooks) {
-      if (
-        typeof hook?.command === 'string' &&
-        hook.command.includes('safety-net.js')
-      ) {
-        return true;
-      }
-      if (
-        Array.isArray(hook?.args) &&
-        hook.args.some(
-          (a) => typeof a === 'string' && a.includes('safety-net.js')
-        )
-      ) {
-        return true;
-      }
-    }
-  }
-  return false;
 }
 
 export async function doctor(opts) {
@@ -128,14 +102,19 @@ export async function doctor(opts) {
   }
 
   let claudeSettings = null;
+  let settingsMalformed = false;
   if (existsSync(paths.claudeSettings)) {
-    ok.push('.claude/settings.json present');
     try {
       claudeSettings = JSON.parse(await readFile(paths.claudeSettings, 'utf8'));
-    } catch {
-      // Unparseable settings — the safety-net registration check below
-      // reports this as a warning with a fix.
-      claudeSettings = null;
+      ok.push('.claude/settings.json present');
+    } catch (err) {
+      // Malformed settings is its own problem — don't report the file as
+      // plainly "present" ok, and don't prescribe `update` as the fix:
+      // update deliberately skips malformed files, so that advice loops.
+      settingsMalformed = true;
+      warnings.push(
+        `.claude/settings.json exists but is not valid JSON (${err.message}) — safety-net hook registration can't be verified, and updates will leave the file untouched rather than risk clobbering it. Fix the JSON syntax by hand (or restore from a .claude/settings.json.bak-* backup if one exists).`
+      );
     }
   } else {
     warnings.push(
@@ -149,12 +128,32 @@ export async function doctor(opts) {
   const safetyNetFix = `npx inner-dialogue@latest update --path "${paths.root}"`;
   if (existsSync(paths.safetyNetHook)) {
     ok.push('.therapy/hooks/safety-net.js present');
+    // Integrity check: compare the installed hook against the hash recorded
+    // at install/update time in version.json. Warning (not error) severity —
+    // users are free to edit the hook, but the posture is that they
+    // shouldn't: the safety net is there for a reason. No record (pre-hook
+    // install or hand-placed script) → skip the check gracefully.
+    const hookRecord = versionData?.files?.['.therapy/hooks/safety-net.js'];
+    if (hookRecord?.hash) {
+      const installedHash = await hashFile(paths.safetyNetHook);
+      if (installedHash === hookRecord.hash) {
+        ok.push('safety-net hook matches its installed version');
+      } else {
+        warnings.push(
+          `safety-net hook (.therapy/hooks/safety-net.js) has been modified from the shipped version. You're free to edit it, but we recommend you don't — the safety net is there for a reason, and edits can quietly break it. To restore the shipped version, run \`${safetyNetFix} --force\` (note: --force also overwrites any other framework files you've edited; a backup is taken first).`
+        );
+      }
+    }
   } else {
     warnings.push(
       `safety-net hook script missing (.therapy/hooks/safety-net.js) — the mechanical crisis-resource backstop is not installed. Run \`${safetyNetFix}\` to install it.`
     );
   }
-  if (hasSafetyNetRegistration(claudeSettings)) {
+  if (settingsMalformed) {
+    // Registration can't be verified and `update` can't fix a malformed file —
+    // the malformed-settings warning above already carries the real fix, so
+    // don't stack a "run update" prescription on top of it.
+  } else if (hasSafetyNetHook(claudeSettings)) {
     ok.push('safety-net hook registered in .claude/settings.json');
   } else {
     warnings.push(

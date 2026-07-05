@@ -49,6 +49,23 @@ function parseList(v) {
     .filter(Boolean);
 }
 
+function printSettingsMerge(merges, dryRun) {
+  for (const m of merges || []) {
+    if (m.action === 'add_safety_net_hook') {
+      process.stdout.write(
+        dryRun
+          ? `\nWill register the safety-net hook in .claude/settings.json.\n`
+          : `\nRegistered the safety-net hook in .claude/settings.json.\n` +
+              (m.backup ? `  Backup: ${m.backup}\n` : '')
+      );
+    } else if (m.action === 'skipped') {
+      process.stdout.write(
+        `\nSkipped .claude/settings.json: ${m.reason}\n`
+      );
+    }
+  }
+}
+
 function printResult(result, json) {
   if (json) {
     process.stdout.write(JSON.stringify(result, null, 2) + '\n');
@@ -59,8 +76,11 @@ function printResult(result, json) {
       `\nReady: ${result.therapist} at ${result.path}\n` +
         `  persona:    ${result.persona}\n` +
         `  structure:  ${result.structure}\n` +
-        `  modalities: ${result.modalities.join(', ')}\n\n` +
-        `Start a session: open the Claude AI app and navigate to ${result.path}, or run \`claude\` in Terminal from that folder.\n`
+        `  modalities: ${result.modalities.join(', ')}\n`
+    );
+    printSettingsMerge(result.settings_merge);
+    process.stdout.write(
+      `\nStart a session: open the Claude AI app and navigate to ${result.path}, or run \`claude\` in Terminal from that folder.\n`
     );
     return;
   }
@@ -105,6 +125,7 @@ function printResult(result, json) {
         `  Start sessions via the Claude AI app, or run \`claude\` in Terminal.\n`
       );
     }
+    printSettingsMerge(p.settings_merge, result.dry_run);
     if (p.registered_on_migration && p.registered_on_migration.length) {
       process.stdout.write(
         `\nFolded into new registry (${p.registered_on_migration.length}):\n`

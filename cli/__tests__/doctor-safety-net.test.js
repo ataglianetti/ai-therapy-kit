@@ -13,6 +13,7 @@ import os from 'node:os';
 import path from 'node:path';
 
 import { doctor } from '../doctor.js';
+import { hashString } from '../lib/hash.js';
 
 // Exec-form registration (the shape update/install write). Plain single-quoted
 // string on purpose: ${CLAUDE_PROJECT_DIR} is a literal placeholder, not a
@@ -39,17 +40,29 @@ function settingsWith(hookEntries) {
 
 // Builds a minimal install that passes every other doctor check, so the only
 // errors/warnings in play are the ones under test.
+const HOOK_FIXTURE_CONTENT = '// fixture stand-in for the real hook\n';
+
 function makeInstall({
   hookScript = true,
+  hookContent = HOOK_FIXTURE_CONTENT,
+  hookRecordHash = null,
   settings = settingsWith([TIME_HOOK_ENTRY, EXEC_FORM_ENTRY]),
 } = {}) {
   const root = mkdtempSync(path.join(os.tmpdir(), 'doctor-safety-net-'));
 
   const therapy = path.join(root, '.therapy');
   mkdirSync(therapy, { recursive: true });
+  const versionFiles = {};
+  if (hookRecordHash) {
+    versionFiles['.therapy/hooks/safety-net.js'] = {
+      version: null,
+      hash: hookRecordHash,
+      source: 'hooks/safety-net.js',
+    };
+  }
   writeFileSync(
     path.join(therapy, 'version.json'),
-    JSON.stringify({ kit_version: '2.8.0', files: {} }, null, 2)
+    JSON.stringify({ kit_version: '2.8.0', files: versionFiles }, null, 2)
   );
   for (const f of [
     'safety-protocol.md',
@@ -71,10 +84,7 @@ function makeInstall({
   if (hookScript) {
     const hooksDir = path.join(therapy, 'hooks');
     mkdirSync(hooksDir, { recursive: true });
-    writeFileSync(
-      path.join(hooksDir, 'safety-net.js'),
-      '// fixture stand-in for the real hook\n'
-    );
+    writeFileSync(path.join(hooksDir, 'safety-net.js'), hookContent);
   }
 
   if (settings !== null) {
@@ -165,13 +175,95 @@ test('settings.json absent entirely: registration warning joins the existing set
   );
 });
 
-test('settings.json unparseable: registration warning, doctor passes', async () => {
+// F20: malformed settings must be named as the problem, not reported as a
+// plain "present" ok. And the fix must be a hand edit — `update` deliberately
+// skips malformed files, so prescribing it would loop forever.
+test('settings.json unparseable: named as malformed, no "run update" prescription, doctor passes', async () => {
   const result = await runDoctor(
     makeInstall({ settings: '{ this is not json' })
   );
+  assert.equal(result.ok, true, 'warnings must not fail validation');
+
+  assert.ok(
+    !result.checks.some((c) => c === '.claude/settings.json present'),
+    'malformed file is not reported as plain present-ok'
+  );
+
+  const malformedWarning = result.warnings.find((w) =>
+    w.includes('not valid JSON')
+  );
+  assert.ok(malformedWarning, 'warning names the malformed JSON');
+  assert.ok(
+    /fix the json syntax by hand/i.test(malformedWarning),
+    'warning carries manual-fix guidance'
+  );
+  assert.ok(
+    /\(.+\)/.test(malformedWarning),
+    'warning includes the parse error detail'
+  );
+
+  assert.ok(
+    !registrationWarning(result),
+    'no stacked not-registered warning (registration is unverifiable, and its fix would prescribe update)'
+  );
+  for (const w of result.warnings) {
+    assert.ok(
+      !w.includes('npx inner-dialogue@latest update'),
+      `no warning prescribes update: ${w}`
+    );
+  }
+});
+
+// F18 (PM ruling 2026-07-05): doctor compares the installed hook against the
+// hash recorded in version.json. Mismatch → WARNING (users may edit, but the
+// posture is that they shouldn't) with a restore path. No record → skip.
+const tamperWarning = (r) =>
+  r.warnings.find((w) => w.includes('modified from the shipped version'));
+const integrityOk = (r) =>
+  r.checks.some((c) => c.includes('safety-net hook matches its installed version'));
+
+test('hook hash matches version.json record: integrity ok, no tamper warning', async () => {
+  const result = await runDoctor(
+    makeInstall({ hookRecordHash: hashString(HOOK_FIXTURE_CONTENT) })
+  );
   assert.equal(result.ok, true);
-  assert.ok(registrationWarning(result), 'registration warning present');
-  assert.ok(warningsCarryFix(result), 'warning carries the one-line fix');
+  assert.ok(integrityOk(result), 'integrity ok entry present');
+  assert.ok(!tamperWarning(result), 'no tamper warning');
+});
+
+test('hook hash mismatch: warning (not error) with posture and --force restore path', async () => {
+  const result = await runDoctor(
+    makeInstall({
+      hookRecordHash: hashString(HOOK_FIXTURE_CONTENT),
+      hookContent: HOOK_FIXTURE_CONTENT + '// user edit\n',
+    })
+  );
+  assert.equal(result.ok, true, 'mismatch is a warning, not an error');
+  assert.equal(result.errors.length, 0, 'no errors');
+  const warning = tamperWarning(result);
+  assert.ok(warning, 'tamper warning present');
+  assert.ok(!integrityOk(result), 'no integrity ok entry');
+  assert.ok(
+    /recommend you don't|safety net is there for a reason/i.test(warning),
+    'warning carries the posture'
+  );
+  assert.ok(
+    warning.includes('npx inner-dialogue@latest update --path') &&
+      warning.includes('--force'),
+    'warning gives the --force restore path'
+  );
+  assert.ok(
+    /also overwrites|backed up|backup/i.test(warning),
+    'warning notes the --force blast radius / backup'
+  );
+});
+
+test('no version.json record for the hook: integrity check skipped gracefully', async () => {
+  const result = await runDoctor(makeInstall({ hookRecordHash: null }));
+  assert.equal(result.ok, true);
+  assert.ok(!tamperWarning(result), 'no tamper warning without a record');
+  assert.ok(!integrityOk(result), 'no integrity ok entry without a record');
+  assert.ok(scriptOk(result), 'script presence still reported ok');
 });
 
 test('registration via shell command string (not exec form) is recognized', async () => {
