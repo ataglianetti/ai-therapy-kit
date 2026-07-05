@@ -102,7 +102,11 @@ function makeInstall({
 
 async function runDoctor(root) {
   try {
-    return await doctor({ path: root });
+    // claudeVersionOutput: null skips the real `claude --version` spawn so
+    // these fixtures stay independent of whatever CLI this machine has
+    // installed. The version check has its own suite
+    // (doctor-claude-version.test.js).
+    return await doctor({ path: root, claudeVersionOutput: null });
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

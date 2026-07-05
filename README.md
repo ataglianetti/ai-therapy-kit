@@ -203,7 +203,7 @@ Honest framing of what it is and isn't:
 - **English only, for now.** Crisis language in other languages won't trigger it. The written safety protocol still applies regardless of language.
 - **It fails open.** If the script ever hits an error, your session continues normally. A broken safety net never interrupts a conversation.
 
-The `doctor` command checks that the script is present, unmodified, and registered. You're free to edit it, but we recommend you don't — the safety net is there for a reason.
+The `doctor` command checks that the script is present, unmodified, and registered. You're free to edit it, but we recommend you don't — the safety net is there for a reason. The hook requires Claude Code 2.1.139 or newer; `doctor` warns if your installed version is older.
 
 ---
 

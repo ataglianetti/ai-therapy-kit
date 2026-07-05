@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 
 import { therapyPaths } from './lib/paths.js';
 import { readVersionJson } from './lib/version.js';
@@ -10,6 +11,59 @@ import { hasSafetyNetHook } from './lib/settings.js';
 // LLM is instructed to add H2s as themes emerge and reorganize around active
 // modalities. We only warn if the file appears truly unstructured.
 const SEED_PROFILE_SECTIONS = ['Background', 'Current Focus', 'Notes'];
+
+// Exec-form hook registration ({"type":"command","command":"node","args":[...]})
+// requires Claude Code >= 2.1.139. On older CLIs the registration is silently
+// ignored — the safety-net hook never runs even though every file-level check
+// passes (verified live on both sides of the boundary during T-006, RUN_LOG
+// Round 3: inert on 2.1.138, fires on 2.1.139). Doctor warns below this floor
+// so a green report can't mean "installed but inert".
+export const MIN_CLAUDE_CODE_VERSION = '2.1.139';
+
+// Parses `claude --version` output (e.g. "2.1.138 (Claude Code)") and compares
+// against the floor. Pure function, exported for direct testing. Returns:
+//   { status: 'ok', version }        — at or above the floor
+//   { status: 'outdated', version }  — parseable and below the floor
+//   { status: 'unknown' }            — unparseable/missing (caller stays silent)
+export function checkClaudeCodeVersion(
+  output,
+  floor = MIN_CLAUDE_CODE_VERSION
+) {
+  const match = /(\d+)\.(\d+)\.(\d+)/.exec(String(output ?? ''));
+  if (!match) {
+    return { status: 'unknown' };
+  }
+  const version = `${match[1]}.${match[2]}.${match[3]}`;
+  const parts = [Number(match[1]), Number(match[2]), Number(match[3])];
+  const floorParts = floor.split('.').map(Number);
+  for (let i = 0; i < 3; i++) {
+    if (parts[i] < floorParts[i]) {
+      return { status: 'outdated', version };
+    }
+    if (parts[i] > floorParts[i]) {
+      return { status: 'ok', version };
+    }
+  }
+  return { status: 'ok', version };
+}
+
+// Spawn seam for the version check. Returns raw `claude --version` output, or
+// null when the CLI isn't on PATH / errors / times out — doctor may run in
+// environments where claude isn't visible, and that must not raise alarms.
+function readClaudeVersionOutput() {
+  try {
+    const result = spawnSync('claude', ['--version'], {
+      encoding: 'utf8',
+      timeout: 5000,
+    });
+    if (result.error || result.status !== 0) {
+      return null;
+    }
+    return result.stdout;
+  } catch {
+    return null;
+  }
+}
 
 function checkProfileStructure(content) {
   const errors = [];
@@ -160,6 +214,26 @@ export async function doctor(opts) {
       `safety-net hook not registered in .claude/settings.json — the hook will not run on prompts even if the script is present. Run \`${safetyNetFix}\` to register it.`
     );
   }
+
+  // Claude Code version floor (see MIN_CLAUDE_CODE_VERSION). Warning severity:
+  // the install itself is fine — it's the runtime that can't execute the hook.
+  // `opts.claudeVersionOutput` is the injectable seam for tests (pass null to
+  // skip the real spawn); undefined means "ask the real CLI".
+  const versionOutput =
+    opts.claudeVersionOutput !== undefined
+      ? opts.claudeVersionOutput
+      : readClaudeVersionOutput();
+  const claudeVersion = checkClaudeCodeVersion(versionOutput);
+  if (claudeVersion.status === 'outdated') {
+    warnings.push(
+      `Claude Code ${claudeVersion.version} is older than ${MIN_CLAUDE_CODE_VERSION}, which does not support the hook registration format this kit uses — the safety-net hook will not run on prompts even though everything is installed correctly. Update Claude Code: run \`claude update\`, or \`npm i -g @anthropic-ai/claude-code@latest\` if you installed via npm.`
+    );
+  } else if (claudeVersion.status === 'ok') {
+    ok.push(
+      `Claude Code ${claudeVersion.version} supports the safety-net hook (>= ${MIN_CLAUDE_CODE_VERSION})`
+    );
+  }
+  // status 'unknown' (claude not on PATH or unparseable output): skip silently.
 
   if (existsSync(paths.context)) {
     ok.push('context/ folder present');
