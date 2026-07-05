@@ -9,6 +9,16 @@
             "command": "date '+{\"hookSpecificOutput\":{\"hookEventName\":\"UserPromptSubmit\",\"additionalContext\":\"Current local time: %H:%M %Z, %A %Y-%m-%d\"}}'"
           }
         ]
+      },
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": ["${CLAUDE_PROJECT_DIR}/.therapy/hooks/safety-net.js"]
+          }
+        ]
       }
     ]
   }

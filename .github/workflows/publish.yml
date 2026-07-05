@@ -12,6 +12,7 @@ on:
       - 'personas/**'
       - 'modalities/**'
       - 'structures/**'
+      - 'hooks/**'
       - 'safety-protocol.md'
       - 'commands.md'
       - 'CLAUDE.template.md'
@@ -36,6 +37,8 @@ jobs:
             echo "Tag $TAG_VERSION does not match package.json version $PKG_VERSION"
             exit 1
           fi
+      - name: Run unit tests
+        run: npm test
       - name: Smoke test CLI
         run: |
           node bin/inner-dialogue.js --version

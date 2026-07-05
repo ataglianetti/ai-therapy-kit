@@ -12,6 +12,7 @@
   "files": [
     "bin/",
     "cli/",
+    "hooks/",
     "personas/",
     "modalities/",
     "structures/",
@@ -27,7 +28,7 @@
     "CHANGELOG.md"
   ],
   "scripts": {
-    "test": "node --test cli/__tests__/"
+    "test": "node --test cli/__tests__/*.test.js"
   },
   "keywords": [
     "therapy",

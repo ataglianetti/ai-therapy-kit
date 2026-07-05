@@ -6,6 +6,7 @@ import { hashString, extractVersion } from './hash.js';
 const SINGLE_FILES = [
   { source: 'safety-protocol.md', target: '.therapy/safety-protocol.md' },
   { source: 'commands.md', target: '.therapy/commands.md' },
+  { source: 'hooks/safety-net.js', target: '.therapy/hooks/safety-net.js' },
 ];
 
 const LIBRARY_DIRS = [
