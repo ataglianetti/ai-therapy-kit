@@ -32,6 +32,8 @@ export function therapyPaths(root) {
     persona: join(r, '.therapy', 'persona.md'),
     sessionStructure: join(r, '.therapy', 'session-structure.md'),
     modalitiesDir: join(r, '.therapy', 'modalities'),
+    hooksDir: join(r, '.therapy', 'hooks'),
+    safetyNetHook: join(r, '.therapy', 'hooks', 'safety-net.js'),
     library: join(r, '.therapy', 'library'),
     libraryPersonas: join(r, '.therapy', 'library', 'personas'),
     libraryModalities: join(r, '.therapy', 'library', 'modalities'),

@@ -44,6 +44,34 @@ function checkProfileStructure(content) {
   return { errors, warnings };
 }
 
+// The safety-net hook is registered under hooks.UserPromptSubmit[].hooks[] as
+// either exec form ({command: "node", args: [".../safety-net.js"]}) or a shell
+// command string containing the script path. Match both.
+function hasSafetyNetRegistration(settings) {
+  const groups = settings?.hooks?.UserPromptSubmit;
+  if (!Array.isArray(groups)) return false;
+  for (const group of groups) {
+    if (!Array.isArray(group?.hooks)) continue;
+    for (const hook of group.hooks) {
+      if (
+        typeof hook?.command === 'string' &&
+        hook.command.includes('safety-net.js')
+      ) {
+        return true;
+      }
+      if (
+        Array.isArray(hook?.args) &&
+        hook.args.some(
+          (a) => typeof a === 'string' && a.includes('safety-net.js')
+        )
+      ) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 export async function doctor(opts) {
   const paths = therapyPaths(opts.path);
   const errors = [];
@@ -99,11 +127,38 @@ export async function doctor(opts) {
     errors.push('profile.md missing');
   }
 
+  let claudeSettings = null;
   if (existsSync(paths.claudeSettings)) {
     ok.push('.claude/settings.json present');
+    try {
+      claudeSettings = JSON.parse(await readFile(paths.claudeSettings, 'utf8'));
+    } catch {
+      // Unparseable settings — the safety-net registration check below
+      // reports this as a warning with a fix.
+      claudeSettings = null;
+    }
   } else {
     warnings.push(
       '.claude/settings.json missing — without it the therapist has no signal for current local time (affects session pacing and time-of-day awareness). Run `inner-dialogue update` to scaffold it.'
+    );
+  }
+
+  // Safety-net hook backstop checks. Warning (not error) severity is
+  // deliberate: pre-feature installs must keep validating clean until the
+  // user runs `update`.
+  const safetyNetFix = `npx inner-dialogue@latest update --path "${paths.root}"`;
+  if (existsSync(paths.safetyNetHook)) {
+    ok.push('.therapy/hooks/safety-net.js present');
+  } else {
+    warnings.push(
+      `safety-net hook script missing (.therapy/hooks/safety-net.js) — the mechanical crisis-resource backstop is not installed. Run \`${safetyNetFix}\` to install it.`
+    );
+  }
+  if (hasSafetyNetRegistration(claudeSettings)) {
+    ok.push('safety-net hook registered in .claude/settings.json');
+  } else {
+    warnings.push(
+      `safety-net hook not registered in .claude/settings.json — the hook will not run on prompts even if the script is present. Run \`${safetyNetFix}\` to register it.`
     );
   }
 
