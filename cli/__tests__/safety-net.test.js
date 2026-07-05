@@ -111,6 +111,70 @@ test('tier-1: method, plan, and overdose references fire', () => {
   assertFires('I thought about an overdose');
 });
 
+test('tier-1: first-person intensifier, past, and planning forms fire (round-2 F15)', () => {
+  assertFires("I'm so suicidal");
+  assertFires('I am so suicidal');
+  assertFires("I'm feeling really suicidal");
+  assertFires("I've never felt this suicidal");
+  assertFires('I felt suicidal');
+  assertFires('I attempted suicide last year');
+  assertFires('attempting suicide');
+  assertFires('I am planning my suicide');
+  assertFires('planning to kill myself');
+  assertFires('I harmed myself last night');
+  assertFires('I shot myself on purpose');
+});
+
+test('negatives: third-person present-tense crisis reports stay silent (round-2 F16)', () => {
+  assertSilent('my brother has been suicidal since the divorce');
+  assertSilent("she's been suicidal before");
+  assertSilent('he said he was feeling suicidal');
+  assertSilent('my friend wants to commit suicide');
+  assertSilent('my son keeps thinking about suicide');
+  assertSilent('my mom keeps thinking about suicide');
+  assertSilent('people who commit suicide often show warning signs');
+  assertSilent('an article about teens thinking about suicide');
+  assertSilent("if you're feeling suicidal you should call 988");
+  assertSilent('his suicidal thoughts scared his wife');
+  assertSilent('the documentary was about people committing suicide');
+});
+
+test('negatives: third-person want-to-die and overdose recounting stay silent (round-2 F26)', () => {
+  assertSilent('my sister wants to die');
+  assertSilent('my grandmother overdosed on her medication');
+});
+
+test('tier-1: first-person want-to-die and overdose forms still fire (round-2 F26)', () => {
+  assertFires('I wanted to die');
+  assertFires('I just wanna die');
+  assertFires('I overdosed');
+  assertFires("I'm going to overdose");
+  assertFires('thinking about overdosing');
+});
+
+test('negatives: phrasal-verb, idiom, and technical overshoots stay silent (round-2 F17)', () => {
+  assertSilent('I checked that task off myself');
+  assertSilent('I finished the report off myself');
+  assertSilent('I keep shooting myself in the foot at work');
+  assertSilent("I don't want to shoot myself in the foot");
+  assertSilent("I can't do this presentation");
+  assertSilent('we cannot go on vacation like this');
+  assertSilent("I can't go on this diet");
+  assertSilent("I can't go on and on about it");
+  assertSilent('how many kms is the trail');
+  assertSilent('the store is a few kms away');
+  assertSilent('we use kms for key management');
+  assertSilent('our kms activation server is down');
+});
+
+test('tier-2: end-of-clause crisis forms still fire (round-2 F17)', () => {
+  assertFires("I can't go on");
+  assertFires('I cannot go on.');
+  assertFires("I can't do this anymore");
+  assertFires("I can't go on like this");
+  assertFires("I can't take it anymore, everything feels heavy");
+});
+
 test('tier-1: first-person suicide phrasings fire (round-1 F12)', () => {
   assertFires("I'm suicidal");
   assertFires('I am suicidal');
@@ -217,6 +281,33 @@ test('fail-open: ~2MB benign prompt exits 0 silently', () => {
   assert.equal(stdout, '');
 });
 
+test('fail-open: oversized stdin payload exits 0 silently (round-2 F25)', () => {
+  // Past the stdin buffer bound the hook stops accumulating and treats the
+  // payload as no-match, even when it contains crisis language — a
+  // pathological payload must never OOM into a nonzero exit.
+  const big = JSON.stringify({
+    prompt: 'I want to die ' + 'a'.repeat(5 * 1024 * 1024)
+  });
+  const { status, stdout } = runHook(big);
+  assert.equal(status, 0);
+  assert.equal(stdout, '');
+});
+
+test('match path: exits promptly even when stdout is never read (round-2 F25)', async () => {
+  // The flush guard must not leave the process hangable on a stdout pipe
+  // nobody drains: the write callback (or the guard timer) ends the run.
+  const child = spawn(process.execPath, [HOOK_PATH], {
+    stdio: ['pipe', 'pipe', 'pipe']
+  });
+  child.stdin.on('error', () => {});
+  child.stdout.pause(); // never consume the child's stdout
+  child.stdin.end(JSON.stringify({ prompt: 'I want to die' }));
+  const start = Date.now();
+  const [code] = await once(child, 'exit');
+  assert.equal(code, 0);
+  assert.ok(Date.now() - start < 8000, 'exited without hanging');
+});
+
 test('fail-open: closed stdout on a match still exits 0 (round-1 F8)', async () => {
   const child = spawn(process.execPath, [HOOK_PATH], {
     stdio: ['pipe', 'pipe', 'pipe']
@@ -306,19 +397,26 @@ test('resources sync: injected block matches safety-protocol.md verbatim (round-
 
 test('pattern hygiene: every pattern source is lowercase (round-1 F14)', () => {
   // The hook lowercases input before matching (normalize-then-match), so an
-  // uppercase character in any pattern can never match. Guard the convention.
+  // uppercase character in any pattern can never match. Guard the
+  // convention across both regex literals and the string-composed
+  // first-person patterns (FP_HEAD / FP_GAP / fp() tails, round-2).
   const hookSource = readFileSync(HOOK_PATH, 'utf8');
   const m = hookSource.match(
-    /var TIER1_PATTERNS = \[[\s\S]*?\];[\s\S]*?var TIER2_PATTERNS = \[[\s\S]*?\];/
+    /var FP_HEAD[\s\S]*?var TIER2_PATTERNS = \[[\s\S]*?\];/
   );
-  assert.ok(m, 'pattern arrays found in hook source');
-  const literals = m[0].match(/\/(?:[^/\\\n]|\\.)+\//g);
+  assert.ok(m, 'pattern definition region found in hook source');
+  // Strip whole-line comments so prose casing does not trip the check.
+  const region = m[0].replace(/^\s*\/\/.*$/gm, '');
+  const literals = region.match(/\/(?:[^/\\\n]|\\.)+\//g) || [];
+  const strings =
+    region.match(/'(?:[^'\\\n]|\\.)*'|"(?:[^"\\\n]|\\.)*"/g) || [];
+  const sources = [...literals, ...strings];
   assert.ok(
-    literals && literals.length >= 30,
-    `expected to extract pattern literals, got ${literals ? literals.length : 0}`
+    sources.length >= 40,
+    `expected to extract pattern sources, got ${sources.length}`
   );
-  for (const lit of literals) {
-    assert.equal(lit, lit.toLowerCase(), `pattern is not lowercase: ${lit}`);
+  for (const src of sources) {
+    assert.equal(src, src.toLowerCase(), `pattern source is not lowercase: ${src}`);
   }
 });
 
