@@ -24,3 +24,10 @@ export async function snapshotTherapy(therapyDir) {
   await cp(therapyDir, dest, { recursive: true });
   return dest;
 }
+
+export async function snapshotFile(filePath) {
+  if (!existsSync(filePath)) return null;
+  const dest = `${filePath}.bak-${timestamp()}`;
+  await cp(filePath, dest);
+  return dest;
+}

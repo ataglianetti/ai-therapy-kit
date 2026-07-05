@@ -11,7 +11,7 @@ import {
   recordFile,
 } from './lib/version.js';
 import { hashString } from './lib/hash.js';
-import { snapshotTherapy } from './lib/backup.js';
+import { snapshotTherapy, snapshotFile } from './lib/backup.js';
 
 const ALWAYS_SKIP_RELATIVE = [
   'profile.md',
@@ -37,6 +37,30 @@ function isActiveCopy(targetRel) {
 async function readIfExists(p) {
   if (!existsSync(p)) return null;
   return readFile(p, 'utf8');
+}
+
+// The canonical safety-net registration is exec form (command: "node",
+// args: [".../.therapy/hooks/safety-net.js"]), but legacy or hand-written
+// installs may register it as a single shell-form command string — treat
+// either as "already registered".
+function hasSafetyNetHook(settings) {
+  const entries = settings?.hooks?.UserPromptSubmit;
+  if (!Array.isArray(entries)) return false;
+  for (const entry of entries) {
+    if (!Array.isArray(entry?.hooks)) continue;
+    for (const h of entry.hooks) {
+      if (typeof h?.command === 'string' && h.command.includes('safety-net.js')) {
+        return true;
+      }
+      if (
+        Array.isArray(h?.args) &&
+        h.args.some((a) => typeof a === 'string' && a.includes('safety-net.js'))
+      ) {
+        return true;
+      }
+    }
+  }
+  return false;
 }
 
 export async function update(opts) {
@@ -93,6 +117,60 @@ export async function update(opts) {
   for (const sf of scaffoldTemplates) {
     if (!existsSync(sf.target)) {
       plan.scaffolded.push({ path: sf.rel });
+    }
+  }
+
+  // Safety-net hook registration (surgical merge). The scaffold path above
+  // only copies the settings template when the file is missing entirely.
+  // When .claude/settings.json already exists we must never clobber it:
+  // check whether the safety-net hook is registered under
+  // hooks.UserPromptSubmit and, if not, plan a surgical append that touches
+  // nothing else in the object. Malformed or unexpectedly-shaped JSON fails
+  // open — report and skip, never crash, never overwrite.
+  plan.settings_merge = [];
+  let parsedSettings = null;
+  if (existsSync(paths.claudeSettings)) {
+    const rawSettings = await readFile(paths.claudeSettings, 'utf8');
+    let candidate = null;
+    try {
+      candidate = JSON.parse(rawSettings);
+    } catch {
+      candidate = null;
+    }
+    if (
+      candidate === null ||
+      typeof candidate !== 'object' ||
+      Array.isArray(candidate)
+    ) {
+      plan.settings_merge.push({
+        path: '.claude/settings.json',
+        action: 'skipped',
+        reason:
+          'settings.json is not a valid JSON object — left untouched; register the safety-net hook manually',
+      });
+    } else {
+      const hooksVal = candidate.hooks;
+      const promptHooks = hooksVal?.UserPromptSubmit;
+      const shapeOk =
+        (hooksVal === undefined ||
+          (typeof hooksVal === 'object' &&
+            hooksVal !== null &&
+            !Array.isArray(hooksVal))) &&
+        (promptHooks === undefined || Array.isArray(promptHooks));
+      if (!shapeOk) {
+        plan.settings_merge.push({
+          path: '.claude/settings.json',
+          action: 'skipped',
+          reason:
+            'hooks.UserPromptSubmit has an unexpected shape — left untouched; register the safety-net hook manually',
+        });
+      } else if (!hasSafetyNetHook(candidate)) {
+        plan.settings_merge.push({
+          path: '.claude/settings.json',
+          action: 'add_safety_net_hook',
+        });
+        parsedSettings = candidate;
+      }
     }
   }
 
@@ -313,7 +391,9 @@ export async function update(opts) {
     plan.new_files.length +
     (plan.forced_overwrites?.length || 0) +
     plan.legacy_removed.length +
-    plan.scaffolded.length;
+    plan.scaffolded.length +
+    plan.settings_merge.filter((m) => m.action === 'add_safety_net_hook')
+      .length;
   const willMigrateRegistry =
     isLegacySchema && plan.unchanged.length > 0;
 
@@ -378,6 +458,36 @@ export async function update(opts) {
     if (!existsSync(sf.target)) {
       await copyFile(sf.source, sf.target);
     }
+  }
+
+  // Surgical settings merge: snapshot the file first (it lives outside
+  // .therapy/, so snapshotTherapy doesn't cover it), then append the
+  // canonical exec-form safety-net entry to hooks.UserPromptSubmit without
+  // reordering or dropping anything else in the object. Idempotent by
+  // construction — the planning check above only queues this when the hook
+  // isn't registered yet.
+  for (const item of plan.settings_merge) {
+    if (item.action !== 'add_safety_net_hook') continue;
+    if (!parsedSettings) continue;
+    item.backup = await snapshotFile(paths.claudeSettings);
+    parsedSettings.hooks = parsedSettings.hooks || {};
+    parsedSettings.hooks.UserPromptSubmit =
+      parsedSettings.hooks.UserPromptSubmit || [];
+    parsedSettings.hooks.UserPromptSubmit.push({
+      matcher: '',
+      hooks: [
+        {
+          type: 'command',
+          command: 'node',
+          args: ['${CLAUDE_PROJECT_DIR}/.therapy/hooks/safety-net.js'],
+        },
+      ],
+    });
+    await writeFile(
+      paths.claudeSettings,
+      JSON.stringify(parsedSettings, null, 2) + '\n',
+      'utf8'
+    );
   }
 
   await writeVersionJson(paths.versionJson, newVersion);
