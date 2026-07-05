@@ -68,8 +68,15 @@ var ADVERBS =
 // ("i'm", "i've") can never be roman numerals, and everyday nouns that
 // merely can take numbering (class, war, stage, level, season) are not in
 // the list, so "after class i was so suicidal" fires (round-4 F40).
+// The first-person token class is SHARED between FP_HEAD and the
+// third-person clause rescue in tpBlock() (round-5 F51 — same move as
+// ADVERBS): the rescue must recognize every subject form FP_HEAD accepts,
+// including the apostrophe-less "im"/"ive", or "ive got the pills to end
+// it all" reads as a det+noun subject instead of a first-person clause.
+var FP_SUFFIX = "'m|'ve|'d|'ll|m|ve";
+var FP_TOKEN = 'i(?:' + FP_SUFFIX + ')?';
 var FP_HEAD =
-  "\\b(?:i(?:'m|'ve|'d|'ll|m|ve)|(?<!\\b(?:chapter|act|section|appendix" +
+  '\\b(?:i(?:' + FP_SUFFIX + ')|(?<!\\b(?:chapter|act|section|appendix' +
   '|exhibit|figure|table|volume|phase)\\s)i)';
 var FP_GAP_FILLERS =
   'am|are|was|be|been|being|has|have|having|had|feel|feels|felt' +
@@ -100,46 +107,83 @@ function fp(tail) {
 //    "we want to die" fires; generic-you stays silent.
 //  - determiner + noun subjects ("my brother", "the article"). This branch
 //    only blocks when NO first-person token appears earlier in the same
-//    clause (round-4 F38/F39): a det+noun inside a first-person clause is
-//    an object, not a subject — "i have the pills to end it all", "i told
-//    my mom that i want to die" fire, while "my brother wants to end it
-//    all" stays silent. The noun slot additionally excludes bare
-//    first-person tokens ("that i want to die") and self-reference nouns
-//    (plan/mind/part/voices/urge...), which are the speaker's own state,
-//    not a third person ("my plan is to end it all", IFS parts language).
+//    clause (round-4 F38/F39; the token class is the shared FP_TOKEN, so
+//    apostrophe-less "im"/"ive" also rescue — round-5 F51): a det+noun
+//    inside a first-person clause is an object, not a subject — "i have
+//    the pills to end it all", "i told my mom that i want to die" fire,
+//    while "my brother wants to end it all" stays silent. The noun slot
+//    additionally excludes first-person tokens ("that i want to die").
+//    The SELF_NOUNS exemption (plan/mind/part/voices/urge... — the
+//    speaker's own state: "my plan is to end it all", IFS parts language)
+//    applies ONLY to first-person/neutral determiners; third-person
+//    possessives (his/her/their/your) block ALL nouns — "his plan is to
+//    end it all" is a report about someone else (round-5 F49).
 //    The clause scan is bounded (80 chars back to a clause boundary) so
 //    matching stays linear on adversarial input.
+// Apostrophe-less contractions (hes/shes/theyre/...) are included for
+// parity with FP_HEAD accepting "im"/"ive" — they are unambiguous
+// third-person tokens (none is an English word on its own; ambiguous
+// forms like "shed"/"hed"/"its" are deliberately excluded).
 var TP_PRON =
   "(?:he|she|they|you|it|who|he's|she's|it's|they're|you're" +
   "|he'd|she'd|they'd|you'd|they've|you've|he'll|she'll|they'll|you'll" +
-  "|it'll)";
+  "|it'll|hes|shes|theyre|youre|theyve|youve)";
 var TP_CHAIN_LINKS =
   'is|are|was|were|be|been|being|has|have|having|had|says|said|say' +
   '|saying|keeps|keep|kept|wants|want|wanted|wanting|feels|feel|felt' +
   '|feeling|thinks|think|thought|thinking|talks|talk|talked|talking' +
   '|seems|seem|seemed|described|discussed|mentioned|admitted|would|will' +
   "|might|may|could|should|must|can't|cant|won't|wont|wouldn't|wouldnt" +
-  '|to|about|of|that|he|she|they|it|you|her|him|them|his|their';
+  '|to|about|of|that|he|she|they|it|you|her|him|them|his|their' +
+  '|with|struggles|struggle|struggled|struggling|deals|deal|dealt' +
+  '|dealing|lives|live|lived|living';
 var TP_CHAIN = '(?:\\s+(?:' + TP_CHAIN_LINKS + '|' + ADVERBS + ')){0,5}';
-var TP_DET = '(?:my|his|her|their|your|our|the|this|that|a|an)';
+// Same chain with at least one link: consumed via tpBlock(TP_CHAIN_MIN1)
+// by patterns where det+adjective directly before the keyword must read
+// as a modifier, not a subject ("my intrusive suicidal thoughts are back"
+// fires; verb-mediated "my son has suicidal thoughts" stays silent) —
+// round-5 F48.
+var TP_CHAIN_MIN1 = '(?:\\s+(?:' + TP_CHAIN_LINKS + '|' + ADVERBS + ')){1,5}';
+var TP_DET_THIRD = '(?:his|her|their|your)';
+var TP_DET_NEUTRAL = '(?:my|our|the|this|that|a|an)';
 var SELF_NOUNS =
   'plan|plans|goal|goals|decision|decisions|mind|brain|head|heart|body' +
   '|soul|gut|part|parts|voice|voices|urge|urges';
-var TP_NOUN = "(?!(?:i|i'[a-z]+|" + SELF_NOUNS + ")\\b)[a-z']+";
-var TP_BLOCK =
-  '(?<!\\b' +
-  TP_PRON +
-  TP_CHAIN +
-  '\\s)' +
-  '(?<!(?:^|[.!?\\n;])(?:(?!\\bi\\b)[^.!?\\n;]){0,80}?\\b' +
-  TP_DET +
+// Any first-person token (shared FP_TOKEN plus longer contractions).
+var TP_NOUN_FP = '(?:' + FP_TOKEN + "|i'[a-z]+)";
+var TP_NOUN_ANY = '(?!' + TP_NOUN_FP + "\\b)[a-z']+";
+var TP_NOUN = '(?!(?:' + TP_NOUN_FP + '|' + SELF_NOUNS + ")\\b)[a-z']+";
+var TP_SUBJ =
+  '(?:' +
+  TP_DET_THIRD +
+  '\\s+' +
+  TP_NOUN_ANY +
+  '(?:\\s+' +
+  TP_NOUN_ANY +
+  ')?' +
+  '|' +
+  TP_DET_NEUTRAL +
   '\\s+' +
   TP_NOUN +
   '(?:\\s+' +
   TP_NOUN +
-  ')?' +
-  TP_CHAIN +
-  '\\s)';
+  ')?)';
+
+function tpBlock(detChain) {
+  return (
+    '(?<!\\b' +
+    TP_PRON +
+    TP_CHAIN +
+    '\\s)' +
+    '(?<!(?:^|[.!?\\n;])(?:(?!\\b' +
+    FP_TOKEN +
+    '\\b)[^.!?\\n;]){0,80}?\\b' +
+    TP_SUBJ +
+    detChain +
+    '\\s)'
+  );
+}
+var TP_BLOCK = tpBlock(TP_CHAIN);
 
 // Subjectless first-person forms ("feeling suicidal again", "planning to
 // commit suicide"): a closed class of dropped-subject heads (progressive /
@@ -157,6 +201,19 @@ function sl(tail) {
 function tp(source) {
   return new RegExp(TP_BLOCK + source);
 }
+
+// Shared overdose tail for the fp()/sl() composites below. The
+// prevention/awareness guard is general; the call guard blocks only the
+// noun compound "an overdose call(s)" — "call(s)" NOT followed by an
+// object token (a digit, a determiner, or a person: "911", "an
+// ambulance", "someone", "me", "it") reads as a noun ("took an overdose
+// call at work") and stays silent; followed by an object it is a help
+// imperative or idiom inside crisis language and fires (round-5 F47).
+var OVERDOSE_TAIL =
+  'overdos(?:e|ed|ing)\\b(?!\\s+(?:prevention|awareness)\\b)' +
+  '(?!\\s+calls?\\b(?!\\s+(?:\\d|an?\\b|the\\b|my\\b|your\\b|his\\b' +
+  '|her\\b|their\\b|our\\b|me\\b|him\\b|them\\b|it\\b|us\\b|someone\\b' +
+  '|somebody\\b)))';
 
 // Tier 1: explicit suicidal-ideation / self-harm / method language.
 // Recall-first: within clearly first-person crisis space, prefer to match.
@@ -196,10 +253,12 @@ var TIER1_PATTERNS = [
   /\bsh(?:oot|ooting|ot)\s+myself\b(?!\s+in\s+the\s+foot)/,
   /\b(?:to|gonna|might|could|should|would|wanna|will|i'?ll|i)\s+(?:just\s+)?off\s+myself\b/,
   /\boffing\s+myself\b/,
-  // The separator width tracks normalize(): newlines survive as clause
-  // boundaries, so "self \nharm" / "self\n harm" leave up to three
-  // whitespace chars between the halves (round-4 F46).
-  /\bself[-\s]{1,3}harm(?!\s+(?:awareness|prevention)\b)/,
+  // The separator width tracks normalize(): zero-width concatenation
+  // ("selfharm", censor-avoidant) through up to three whitespace chars
+  // ("self \n harm") match, but at most ONE newline — a blank line is a
+  // paragraph break, not a split word, so "my old self\n\nharm reduction
+  // is the topic at work" stays silent (round-4 F46, round-5 F50).
+  /\bself(?!(?: ?\n){2})[-\s]{0,3}harm(?!\s+(?:awareness|prevention)\b)/,
   fp('suicidal\\b'),
   sl('suicidal\\b'),
   // Anti-anchored, not allowlisted (round-4 F37): elided-first-person
@@ -207,9 +266,22 @@ var TIER1_PATTERNS = [
   // thoughts wont stop") fire; explicit third-person possessives and
   // subject chains ("his suicidal thoughts", "my son has suicidal
   // thoughts") and topical "patients with suicidal ideation" stay silent.
+  // Round-5 F48: the det branch requires >=1 chain verb here, so
+  // det+adjective directly before "suicidal" reads as a modifier, not a
+  // subject ("my intrusive suicidal thoughts are back" fires). The
+  // with-guard is scoped to professional/topical subjects (up to two
+  // non-first-person words before "with" cover "teens who struggle
+  // with..."), so first-person struggle idioms ("i'm struggling with
+  // suicidal thoughts", "living with suicidal ideation is exhausting")
+  // fire.
   new RegExp(
-    TP_BLOCK +
-      "(?<!\\b(?:his|her|their|your)\\s)(?<!\\bwith\\s)" +
+    tpBlock(TP_CHAIN_MIN1) +
+      "(?<!\\b(?:his|her|their|your)\\s)" +
+      '(?<!\\b(?:patients?|people|person|clients?|teens?|teenagers?' +
+      '|adolescents?|adults?|kids?|children|students?|veterans?|those' +
+      '|anyone|someone|somebody|folks)\\s+(?:(?!' +
+      FP_TOKEN +
+      "\\b)[a-z']+\\s+){0,2}with\\s)" +
       '\\bsuicidal\\s+(?:thoughts?|ideation)\\b'
   ),
   fp('th(?:ink(?:ing)?|ought)\\s+(?:about|of)\\s+suicide\\b'),
@@ -225,9 +297,13 @@ var TIER1_PATTERNS = [
   tp('\\battempting\\s+suicide\\b'),
   // The topical-suffix guard mirrors the self-harm awareness/prevention
   // guard (round-4 F44): "taking an overdose prevention course" / "took an
-  // overdose call at work" are professional/topical, not crisis.
-  fp('overdos(?:e|ed|ing)\\b(?!\\s+(?:prevention|awareness|call|calls)\\b)'),
-  sl('overdos(?:e|ed|ing)\\b(?!\\s+(?:prevention|awareness|call|calls)\\b)'),
+  // overdose call at work" are professional/topical, not crisis. The call
+  // guard is scoped to the noun-compound reading only (round-5 F47):
+  // "overdose call" followed by an object token is an unpunctuated help
+  // imperative ("overdose call 911", "overdose call an ambulance") or an
+  // idiom ("overdose call me crazy") inside crisis language, and fires.
+  fp(OVERDOSE_TAIL),
+  sl(OVERDOSE_TAIL),
   tp('\\bthink(?:ing)?\\s+(?:about|of)\\s+overdosing\\b'),
   /\bmy\s+suicide\s+(?:note|plan|attempt)\b/,
   tp('\\bplan(?:ning|ned)?\\s+to\\s+(?:die|kill|end\\s+(?:it|my\\s+life))\\b'),
@@ -299,9 +375,14 @@ if (envTimeout > 0) {
 // Bound the stdin buffer: past this many characters the hook stops
 // accumulating, so a pathological payload can never OOM into a nonzero
 // exit. The retained prefix is still scanned (raw, since truncated JSON
-// can't parse) — crisis language in the first 4MB of an oversized payload
-// fires; anything past the bound is treated as no-match. Real prompts are
-// orders of magnitude smaller.
+// can't parse): raw mode normalizes and matches the WHOLE retained JSON
+// text — keys, braces, and escape sequences included, not just the prompt
+// value. Newlines inside the prompt arrive as the two-character JSON
+// escape (backslash + "n") in this mode, so newline-dependent patterns
+// (clause anchors, the self-harm separator) do not see real newlines;
+// plain keyword patterns still fire. Crisis language in the first 4MB of
+// an oversized payload fires; anything past the bound is treated as
+// no-match. Real prompts are orders of magnitude smaller.
 var MAX_STDIN_CHARS = 4 * 1024 * 1024;
 
 function normalize(text) {
@@ -401,7 +482,8 @@ try {
     try {
       if (overflowed) {
         // Oversized payload: the truncated input can't JSON.parse, so scan
-        // the retained raw prefix directly. Crisis language early in a
+        // the retained raw prefix directly (whole-payload semantics — see
+        // the MAX_STDIN_CHARS note). Crisis language early in a
         // pathological payload still fires; past the bound is no-match.
         scanAndEmit(normalize(chunks.join('')));
       } else {

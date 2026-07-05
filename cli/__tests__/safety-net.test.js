@@ -381,6 +381,68 @@ test('tier-1: self-harm split across space+newline fires (round-4 F46)', () => {
   assertFires('self\nharm');
 });
 
+test('tier-1: overdose with help-imperative or idiom tail fires (round-5 F47)', () => {
+  assertFires('i overdosed call 911');
+  assertFires('i took an overdose call an ambulance');
+  assertFires("i'm going to overdose call someone please");
+  assertFires('im gonna overdose call someone please');
+  assertFires('been wanting to overdose call me weak');
+  assertFires('i want to overdose call it what you want');
+  assertFires('i might overdose call me crazy');
+});
+
+test('tier-1: struggle/deal/live-with idioms and modified suicidal thoughts fire (round-5 F48)', () => {
+  assertFires("i'm struggling with suicidal thoughts");
+  assertFires('i struggle with suicidal thoughts');
+  assertFires("i'm dealing with suicidal thoughts");
+  assertFires("i've been living with suicidal thoughts for years");
+  assertFires("i've been dealing with suicidal ideation");
+  assertFires('struggling with suicidal thoughts');
+  assertFires('living with suicidal ideation is exhausting');
+  assertFires('my intrusive suicidal thoughts are back');
+  assertFires('the constant suicidal thoughts wont stop');
+  assertFires('my recurring suicidal ideation is ruining me');
+});
+
+test('negatives: professional/topical and third-person with-forms stay silent (round-5 F48)', () => {
+  assertSilent('an article about suicidal ideation in teens');
+  assertSilent('he is struggling with suicidal thoughts');
+  assertSilent('my brother struggles with suicidal thoughts');
+  assertSilent("she's been dealing with suicidal ideation");
+  assertSilent('shes been dealing with suicidal ideation');
+  assertSilent('hes struggling with suicidal thoughts');
+  assertSilent('teens who struggle with suicidal ideation need help');
+  assertSilent('a person with suicidal ideation should get help');
+});
+
+test('negatives: third-person possessive self-noun constructions stay silent (round-5 F49)', () => {
+  assertSilent('his plan is to end it all');
+  assertSilent('their goal is to end it all');
+  assertSilent('her mind wants to end it all');
+  assertSilent('their part wanted to die');
+  assertSilent('his urge to end it all is back');
+  assertSilent('she said her goal is to end it all');
+  assertSilent('the voices in his head say to end it all');
+});
+
+test('tier-1: first-person/neutral self-noun constructions keep firing (round-5 F49)', () => {
+  assertFires('my plan is to end it all');
+  assertFires('the urge to end it all is back');
+  assertFires('our plan is to end it all');
+});
+
+test('tier-1: concatenated selfharm fires; blank-line stitching stays silent (round-5 F50)', () => {
+  assertFires('i keep thinking about selfharm');
+  assertFires('selfharm again tonight');
+  assertSilent('my old self\n\nharm reduction is the topic at work');
+  assertSilent('self-harm awareness month');
+});
+
+test('tier-1: apostrophe-less first-person clause rescue fires (round-5 F51)', () => {
+  assertFires('ive got the pills to end it all');
+  assertFires('im holding the pills to end it all');
+});
+
 // Extract a word-class declaration from the hook source and return its
 // alternation members as a plain array ("var NAME = 'a|b' + '|c';" → [a,b,c]).
 function wordClass(hookSource, name) {
@@ -389,10 +451,15 @@ function wordClass(hookSource, name) {
   const joined = (decl[0].match(/'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*"/g) || [])
     .map((s) => s.slice(1, -1))
     .join('');
-  return joined
+  const words = joined
     .replace(/\\\\[a-z]\+?|\(\?:|\)|\{\d+(?:,\d+)?\}/g, '')
     .split('|')
     .filter(Boolean);
+  // Guard the extraction itself (round-5 F52): a refactor that changes the
+  // declaration shape must fail loudly here, not vacuously pass the
+  // membership checks below on an empty list.
+  assert.ok(words.length > 0, `${name} extraction produced at least one word`);
+  return words;
 }
 
 test('FP_GAP membership guard: dropping a gap word breaks the suite (round-3 F36)', () => {
@@ -434,7 +501,21 @@ test('word-class drift guard: shared adverbs, SL_HEAD subset, chain exclusions (
   const fpGapDecl = hookSource.match(/var FP_GAP =[\s\S]*?;/);
   const tpChainDecl = hookSource.match(/var TP_CHAIN =[\s\S]*?;/);
   assert.ok(fpGapDecl && /\bADVERBS\b/.test(fpGapDecl[0]), 'FP_GAP consumes ADVERBS');
+  assert.ok(
+    fpGapDecl && /\bFP_GAP_FILLERS\b/.test(fpGapDecl[0]),
+    'FP_GAP consumes FP_GAP_FILLERS'
+  );
   assert.ok(tpChainDecl && /\bADVERBS\b/.test(tpChainDecl[0]), 'TP_CHAIN consumes ADVERBS');
+
+  // Round-5 F51: the third-person clause rescue must recognize the same
+  // first-person tokens FP_HEAD accepts — both sides derive from the
+  // shared FP_SUFFIX constant, consumed via FP_TOKEN in tpBlock().
+  const fpHeadDecl = hookSource.match(/var FP_HEAD =[\s\S]*?;/);
+  assert.ok(fpHeadDecl && /\bFP_SUFFIX\b/.test(fpHeadDecl[0]), 'FP_HEAD consumes FP_SUFFIX');
+  const fpTokenDecl = hookSource.match(/var FP_TOKEN =[\s\S]*?;/);
+  assert.ok(fpTokenDecl && /\bFP_SUFFIX\b/.test(fpTokenDecl[0]), 'FP_TOKEN consumes FP_SUFFIX');
+  const tpBlockFn = hookSource.match(/function tpBlock[\s\S]*?\n\}/);
+  assert.ok(tpBlockFn && /\bFP_TOKEN\b/.test(tpBlockFn[0]), 'tpBlock clause rescue consumes FP_TOKEN');
 
   // Every subjectless head must be absorbable as a first-person gap filler
   // ("i have been feeling suicidal" needs FP_GAP to cross what SL_HEAD
