@@ -192,6 +192,19 @@ Your AI therapist:
 - **911** — Immediate emergencies
 - **[findahelpline.com](https://findahelpline.com)** — International
 
+### Mechanical safety layer
+
+Every install includes a small script that checks each message you send for explicit first-person crisis language — phrases like "I want to die." On a match, it quietly attaches the emergency resources above, plus a reminder to your AI therapist to follow the crisis protocol, to that message. Because it runs on every message, it works even deep into a long session, when instructions from the start of the conversation may no longer be in front of the AI.
+
+Honest framing of what it is and isn't:
+
+- **It's a keyword pattern-matcher, not crisis detection.** It can't understand context or assess how you're actually doing. That judgment stays with the AI, guided by the written safety protocol — which remains the primary safety layer. This script is a backstop.
+- **It's scoped toward first-person language.** Talking about someone else ("my brother has been struggling"), processing grief, or discussing something from a book or the news is filtered out — though no keyword filter is perfect. That scoping is deliberate.
+- **English only, for now.** Crisis language in other languages won't trigger it. The written safety protocol still applies regardless of language.
+- **It fails open.** If the script ever hits an error, your session continues normally. A broken safety net never interrupts a conversation.
+
+The `doctor` command checks that the script is present, unmodified, and registered. You're free to edit it, but we recommend you don't — the safety net is there for a reason. The hook requires Claude Code 2.1.139 or newer; `doctor` warns if your installed version is older.
+
 ---
 
 ## Privacy

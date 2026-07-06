@@ -9,6 +9,7 @@ import { packageFile, therapyPaths, expandHome } from './lib/paths.js';
 import { loadFramework, listLibrary, libraryAbsolute } from './lib/framework.js';
 import { emptyVersionJson, recordFile, writeVersionJson } from './lib/version.js';
 import { hashString } from './lib/hash.js';
+import { applySafetyNetMerge, SETTINGS_REL_PATH } from './lib/settings.js';
 
 const PERSONA_LABELS = {
   'warm-4o': 'Warm 4o-Style',
@@ -219,8 +220,32 @@ export async function install(rawOpts) {
     await copyFile(packageFile('profile.template.md'), paths.profile);
   }
 
+  // Settings: scaffold from the template when missing. When the folder
+  // already has a .claude/settings.json (install --force over an existing
+  // setup, or a pre-created project folder), never clobber it — apply the
+  // same surgical append-if-absent merge `update` uses, backup first.
+  const settingsMerge = [];
   if (!existsSync(paths.claudeSettings)) {
     await copyFile(packageFile('claude-settings.template.json'), paths.claudeSettings);
+  } else {
+    // applySafetyNetMerge is fail-soft: an fs failure inside the merge comes
+    // back as { merged: false, code: 'error', reason } rather than throwing —
+    // everything else about the setup is fine, so the run completes and
+    // version.json is still written, with the skip reason surfaced.
+    const mergeResult = await applySafetyNetMerge(paths.claudeSettings);
+    if (mergeResult.merged) {
+      settingsMerge.push({
+        path: SETTINGS_REL_PATH,
+        action: 'add_safety_net_hook',
+        backup: mergeResult.backup,
+      });
+    } else if (mergeResult.code !== 'already_registered') {
+      settingsMerge.push({
+        path: SETTINGS_REL_PATH,
+        action: 'skipped',
+        reason: mergeResult.reason,
+      });
+    }
   }
 
   if (!existsSync(paths.contextIndex)) {
@@ -239,5 +264,6 @@ export async function install(rawOpts) {
     structure: opts.structure,
     modalities: opts.modalities,
     files_written: Object.keys(versionData.files).length + 1,
+    settings_merge: settingsMerge,
   };
 }

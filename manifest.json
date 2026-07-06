@@ -15,12 +15,18 @@
       "required": true,
       "description": "Customization commands (import, update, persona, etc.)"
     },
+    "safety-net": {
+      "file": "hooks/safety-net.js",
+      "target": ".therapy/hooks/safety-net.js",
+      "required": true,
+      "description": "Mechanical crisis-language backstop hook (English-only pattern matcher). Injects the safety-protocol reminder when a prompt matches crisis language; the prose safety protocol remains authoritative."
+    },
     "claude-settings": {
       "file": "claude-settings.template.json",
       "target": ".claude/settings.json",
       "required": false,
       "scaffold_only": true,
-      "description": "Claude Code hooks for the therapist install. Default ships a UserPromptSubmit hook that emits current local time. Scaffolded on install/update; never overwritten."
+      "description": "Claude Code hooks for the therapist install. Registers two UserPromptSubmit hooks: the current-local-time hook and the safety-net crisis-language backstop hook. Scaffolded on install/update; never overwritten."
     },
     "context-index": {
       "file": "context/index.template.md",

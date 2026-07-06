@@ -12,6 +12,7 @@ import {
 } from './lib/version.js';
 import { hashString } from './lib/hash.js';
 import { snapshotTherapy } from './lib/backup.js';
+import { planSafetyNetMerge, applySafetyNetMerge } from './lib/settings.js';
 
 const ALWAYS_SKIP_RELATIVE = [
   'profile.md',
@@ -95,6 +96,17 @@ export async function update(opts) {
       plan.scaffolded.push({ path: sf.rel });
     }
   }
+
+  // Safety-net hook registration (surgical merge). The scaffold path above
+  // only copies the settings template when the file is missing entirely.
+  // When .claude/settings.json already exists we must never clobber it:
+  // cli/lib/settings.js checks whether the safety-net hook is registered
+  // under hooks.UserPromptSubmit and, if not, plans a surgical append that
+  // touches nothing else in the object. Malformed or unexpectedly-shaped JSON
+  // fails open — report and skip, never crash, never overwrite.
+  plan.settings_merge = [];
+  const settingsMergePlan = await planSafetyNetMerge(paths.claudeSettings);
+  if (settingsMergePlan) plan.settings_merge.push(settingsMergePlan);
 
   for (const f of framework) {
     if (isProtected(f.target)) continue;
@@ -313,16 +325,24 @@ export async function update(opts) {
     plan.new_files.length +
     (plan.forced_overwrites?.length || 0) +
     plan.legacy_removed.length +
-    plan.scaffolded.length;
+    plan.scaffolded.length +
+    plan.settings_merge.filter((m) => m.action === 'add_safety_net_hook')
+      .length;
   const willMigrateRegistry =
     isLegacySchema && plan.unchanged.length > 0;
 
   if (willWrite === 0 && !willMigrateRegistry) {
+    // When the only plan item is a skipped settings merge (e.g. malformed
+    // settings.json), "Already up to date." right after the skip notice reads
+    // as a contradiction — suppress it and let the skip reason stand alone.
+    const mergeSkipped = plan.settings_merge.some(
+      (m) => m.action === 'skipped'
+    );
     return {
       ok: true,
       backup: null,
       plan,
-      message: 'Already up to date.',
+      ...(mergeSkipped ? {} : { message: 'Already up to date.' }),
     };
   }
 
@@ -377,6 +397,31 @@ export async function update(opts) {
   for (const sf of scaffoldTemplates) {
     if (!existsSync(sf.target)) {
       await copyFile(sf.source, sf.target);
+    }
+  }
+
+  // Surgical settings merge: applySafetyNetMerge snapshots the file first (it
+  // lives outside .therapy/, so snapshotTherapy doesn't cover it), appends the
+  // canonical exec-form entry without reordering or dropping anything else,
+  // and writes atomically. The apply step is self-sufficient — it re-reads and
+  // re-verifies the file rather than trusting state captured at planning time,
+  // so if the file changed underneath us the item downgrades to a skip with a
+  // reason instead of silently no-opping or clobbering.
+  for (const item of plan.settings_merge) {
+    if (item.action !== 'add_safety_net_hook') continue;
+    // applySafetyNetMerge is fail-soft: an fs failure inside the merge comes
+    // back as { merged: false, code: 'error', reason } rather than throwing,
+    // so the run completes (framework files are already written above and
+    // version.json is written below — a crash here would leave a stale hash
+    // registry and doctor would false-flag every updated file as "modified").
+    const mergeResult = await applySafetyNetMerge(paths.claudeSettings);
+    if (mergeResult.merged) {
+      item.backup = mergeResult.backup;
+    } else {
+      item.action = 'skipped';
+      item.reason =
+        mergeResult.reason ||
+        'settings.json changed between planning and writing — merge skipped.';
     }
   }
 

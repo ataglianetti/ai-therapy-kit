@@ -201,6 +201,7 @@ When the user says "update my therapist" / "check for updates":
    - `plan.updates` → "Updated X files (safety-protocol 1.0→1.1, ...)"
    - `plan.new_files` → "Added Y new files to your library"
    - `plan.skipped_user_edited` → "Skipped Z files you customized — your edits are preserved. Want me to overwrite them? (re-run with `--force`)"
+   - `plan.settings_merge` → merged entries: "Registered the safety-net hook in settings.json — backup saved at {backup_path}"; skipped entries: "Couldn't update settings.json ({reason}) — it needs a fix by hand"
    - `backup` → Tell user where the snapshot was saved
 4. **Never touch** `profile.md`, `sessions/`, or `CLAUDE.md` — the CLI doesn't, and neither should you.
 

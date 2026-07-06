@@ -6,7 +6,17 @@
         "hooks": [
           {
             "type": "command",
-            "command": "date '+{\"hookSpecificOutput\":{\"hookEventName\":\"UserPromptSubmit\",\"additionalContext\":\"Current local time: %H:%M %Z, %A %Y-%m-%d\"}}'"
+            "command": "node -e \"var d=new Date();var p=function(n){return(n<10?'0':'')+n};var tz=d.toLocaleTimeString('en-US',{timeZoneName:'short'}).split(' ').pop();var day=d.toLocaleDateString('en-US',{weekday:'long'});console.log(JSON.stringify({hookSpecificOutput:{hookEventName:'UserPromptSubmit',additionalContext:'Current local time: '+p(d.getHours())+':'+p(d.getMinutes())+' '+tz+', '+day+' '+d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())}}))\""
+          }
+        ]
+      },
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": ["${CLAUDE_PROJECT_DIR}/.therapy/hooks/safety-net.js"]
           }
         ]
       }
