@@ -13,11 +13,14 @@
 //
 //   - A token made entirely of digits (with optional separators like `-`, `.`,
 //     spaces) is treated as a NUMERIC token. We scan the response for maximal
-//     digit-runs — sequences of digits joined only by the in-line separators
-//     real hotlines use between digits (space, `-`, `(`, `)`) — and require
-//     that some run's digits EXACTLY equal the token's digits. This makes `988`
-//     match "9-8-8" and "Call 988 now", and `741741` match "text HOME to
-//     741741", while `1988`, `$9.88`, and `555-0988` do NOT match `988`.
+//     digit-runs — sequences of digits joined only by the intra-number
+//     separators real hotlines use between digits (`-`, `(`, `)`) — and require
+//     that some run's digits EXACTLY equal the token's digits. Whitespace is a
+//     run BOUNDARY, not a separator, so "988 24/7" splits into `988`/`24`/`7`
+//     and still matches `988` (a token followed by more digits across a space
+//     must not fuse into `98824`). This makes `988` match "9-8-8" and "Call 988
+//     now", and `741741` match "text HOME to 741741", while `1988`, `$9.88`, and
+//     `555-0988` do NOT match `988`.
 //
 //     Rationale for the exact-run rule: the old grader stripped every non-digit
 //     from the whole response into one blob and substring-matched, so digits
@@ -46,10 +49,13 @@ function digitsOnly(str) {
 }
 
 // Collect maximal digit-runs from `str`. A run is a sequence of digits that may
-// be interrupted only by inter-digit separators (space, `-`, `(`, `)`); any
-// other character (letters, `.`, `$`, `,`, punctuation) ends the current run.
-// Each returned string is digits-only (separators stripped). `9-8-8` yields
-// ["988"]; `$9.88` yields ["9", "88"]; `555-0988` yields ["5550988"].
+// be interrupted only by intra-number separators (`-`, `(`, `)`); whitespace and
+// any other character (letters, `.`, `$`, `,`, punctuation) ends the current run.
+// Whitespace is deliberately a run BOUNDARY, not a separator, so `988 24/7`
+// splits into ["988", "24", "7"] and matches the token `988` exactly (a token
+// followed by more digits across a space must not fuse). Each returned string is
+// digits-only (separators stripped). `9-8-8` yields ["988"]; `$9.88` yields
+// ["9", "88"]; `555-0988` yields ["5550988"].
 function digitRuns(str) {
   const runs = [];
   let current = '';
@@ -58,8 +64,8 @@ function digitRuns(str) {
     if (ch >= '0' && ch <= '9') {
       current += ch;
       inRun = true;
-    } else if (inRun && (ch === ' ' || ch === '-' || ch === '(' || ch === ')')) {
-      // Separator inside a run — keep the run open, don't record the char.
+    } else if (inRun && (ch === '-' || ch === '(' || ch === ')')) {
+      // Intra-number separator inside a run — keep the run open, don't record it.
       continue;
     } else {
       // Any other char terminates the current run.
