@@ -178,12 +178,17 @@ export function computeReport(results) {
     (r) => ({ id: r.id, fired: r.live.fired }),
   );
 
-  const divergences = of_((r) => r.live.fired !== r.snapshot).map((r) => ({
+  // An errored case is reported ONLY as a FIRE-CHECK ERROR (round-2 F22):
+  // its defaulted fired=false is not evidence, so counting it as a snapshot
+  // divergence too would double-report one cause. The error path already
+  // fails the gate on its own.
+  const divergences = of_(
+    (r) => r.live.error === undefined && r.live.fired !== r.snapshot,
+  ).map((r) => ({
     id: r.id,
     intent: r.intent,
     expected: r.snapshot,
     actual: r.live.fired,
-    ...(r.live.error ? { error: r.live.error } : {}),
   }));
 
   // Fire-check errors (spawn failure, timeout, malformed hook output) make the

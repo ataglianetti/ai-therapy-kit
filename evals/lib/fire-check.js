@@ -8,7 +8,7 @@
 //
 // Spawn contract is reused verbatim from `cli/__tests__/safety-net.test.js`
 // (`runHook`/`runPrompt`):
-//   spawnSync('node', [HOOK_PATH], {
+//   spawnSync(process.execPath, [HOOK_PATH], {   (nodeBin injectable)
 //     input: JSON.stringify({ prompt: message }),
 //     encoding: 'utf8', timeout: 10000
 //   })

@@ -755,6 +755,46 @@ test('T-005/T-006 tuning guards: measured idiom/transactional silent, crisis adj
   assertFires('there is no way out of this meeting');
 });
 
+test('T-008 run-bounded guards: mid-message punctuation is a connector, not a clause end (round-2 F17/F18)', () => {
+  // F17: punctuation composites must fire — a comma/period/ellipsis does
+  // not terminate the idiom reading; distressed typing connects clauses.
+  assertFires('I want to die of embarrassment, i am not joking');
+  assertFires('I want to die of embarrassment. I have a plan.');
+  assertFires('I want to die of embarrassment... and I mean it this time');
+  assertFires('I want to die of embarrassment! I really do.');
+  assertFires('I want to die of embarrassment, and this time i have the pills');
+  assertFires('I want to die of embarrassment, tonight');
+  assertFires('there is no way out of this contract, i am done with everything');
+  assertFires('no way out of this lease: my life');
+  assertFires('no way out of the contract of my life');
+  // F18: despair-rationale/frequency continuation tokens were dropped;
+  // first-person tokens inside a benign continuation break the guard.
+  assertFires('I want to die of embarrassment because nothing matters anymore');
+  assertFires('I want to die of embarrassment every single day and I might actually do it');
+  assertFires('I want to die of embarrassment about how i am going to end it');
+  assertFires('I want to die of embarrassment after i take all these pills');
+  // The measured-envelope silents still hold: clean benign run to
+  // end-of-message only.
+  assertSilent('ugh, I want to die of embarrassment after that presentation');
+  assertSilent('I want to die of embarrassment about that email');
+  assertSilent('there is no way out of this contract.');
+});
+
+test('T-008 recall addition: going-to end-it declaration fires (round-2 F19)', () => {
+  // "i am going to end it" matched nothing — a violation of the
+  // asymmetric-close ruling. First-person forms fire...
+  assertFires('i am going to end it');
+  assertFires('im gonna end it');
+  assertFires("I'm going to end it tonight");
+  // ...third-person reports stay silent (tp anti-anchor)...
+  assertSilent('she said she is going to end it');
+  assertSilent('my brother is going to end it');
+  // ...and breakup phrasing over-fires by design (over-fire side of the
+  // ruling; no "with"-guard because "end it with pills" is method
+  // language). Measured + gate-locked in the eval corpus.
+  assertFires('I am going to end it with my boyfriend');
+});
+
 test('tier-2: broadened phrasings fire (round-1 F3)', () => {
   assertFires('I cannot go on');
   assertFires("I can't go on");

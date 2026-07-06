@@ -233,21 +233,26 @@ var OVERDOSE_TAIL =
   '|last|twice' +
   '|cent(?:er|re)s?|lines?|logs?|volume|training|shifts?)\\b)';
 
-// Die-of-idiom suffix guard (crisis-eval-precision T-005/T-A, PM tuning
-// authorization 2026-07-06; RETREATED to the measured envelope in T-006
-// after adversarial review): ONLY "of embarrassment" — the single noun a
-// measured over-fire covers (05-venting-die-embarrassment) — and ONLY when
-// followed by a clause end or an enumerated benign continuation ("about /
-// after / over / at / because / in front of ..."). Review round-1 F1
-// live-proved that broader noun lists silence real crisis composites
-// ("i want to die of shame. i have a plan." must fire — shame is a core
-// suicidality affect, not an unambiguous idiom), and F2 proved unbounded
-// suffixes eat crisis continuations. Recall-first: any unlisted noun, any
-// unlisted continuation ("of embarrassment and i mean it"), fires.
+// Die-of-idiom suffix guard (crisis-eval-precision T-005/T-A; retreated to
+// the measured envelope in T-006; run-bounded in T-008 after review round 2
+// F17/F18): ONLY "of embarrassment" — the single noun a measured over-fire
+// covers (05-venting-die-embarrassment) — and ONLY when the idiom runs
+// CLEAN to the end of the message: an optional benign-preposition
+// continuation (about/after/over/at/in) containing no first-person token
+// (shared FP_TOKEN) and no clause punctuation, then optional trailing
+// punctuation, then end of message. Round-2 review live-proved that
+// treating mid-message punctuation as clause end silenced crisis
+// composites ("i want to die of embarrassment, i am not joking",
+// "...of embarrassment. I have a plan." — F17), and that despair-rationale
+// continuation tokens (because/when/whenever/every) were unmeasured riders
+// (F18). Recall-first: any unlisted noun ("of shame" — a core suicidality
+// affect, round-1 F1), any non-benign continuation ("and i mean it"), any
+// first-person token or clause break in the continuation, fires.
 var DIE_IDIOM_GUARD =
   '(?!\\s+of\\s+embarrassment\\b' +
-  '(?: *(?:$|\\n|[.!?,;:…])' +
-  '|\\s+(?:about|after|over|at|because|when|whenever|every|in)\\b))';
+  '(?:\\s+(?:about|after|over|at|in)\\b' +
+  '(?:(?!\\b' + FP_TOKEN + '\\b)[^.!?,;:…\\n]){0,40})?' +
+  ' *[.!?,;:…]* *(?:$|\\n))';
 
 // Tier 1: explicit suicidal-ideation / self-harm / method language.
 // Recall-first: within clearly first-person crisis space, prefer to match.
@@ -276,6 +281,15 @@ var TIER1_PATTERNS = [
   /\bend(?:ing)?\s+my\s+(?:own\s+)?life\b/,
   tp('\\bend(?:ing)?\\s+it\\s+all\\b'),
   /\bwant(?:ed)?\s+to\s+end\s+it\b/,
+  // Round-2 review F19 (recall addition per the asymmetric-close ruling —
+  // "no explicit first-person crisis phrase may be silent"): the plain
+  // future declaration "i am going to end it" matched nothing (tier-1 had
+  // want/thinking/plan heads but not going/gonna). Anti-anchored so
+  // third-person reports ("she is going to end it") stay silent. Accepted
+  // consequence, over-fire side of the ruling: breakup phrasing ("going to
+  // end it with him") fires — measured + gate-locked in the eval corpus;
+  // no "with"-guard because "end it with pills" is method language.
+  tp('\\b(?:going\\s+to|gonna)\\s+end\\s+it\\b'),
   /\bthink(?:ing)?\s+(?:about|of)\s+ending\s+it\b/,
   /\b(?:don'?t|do\s+not)\s+(?:want\s+to|wanna)\s+be\s+here\b/,
   /\b(?:don'?t|do\s+not)\s+(?:want\s+to|wanna)\s+live\b/,
@@ -387,17 +401,21 @@ var TIER2_PATTERNS = [
   /\bno\s+reason\s+to\s+(?:live|go\s+on|keep\s+going)\b/,
   /\bnothing\s+(?:left\s+)?to\s+live\s+for\b/,
   /\bno\s+point\s+in\s+(?:living|going\s+on)\b/,
-  // Transactional-noun suffix guard (crisis-eval-precision T-005/T-B, PM
-  // tuning authorization 2026-07-06; RETREATED to the measured envelope in
-  // T-006 after adversarial review): ONLY "of <det> contract/lease" — the
-  // nouns the measured F12 over-fire covers (06-idiom-f12-no-way-out-
-  // contract: "no way out of this contract" in a lease-reading message) —
-  // and ONLY when the noun ends the clause. Review round-1 F2 live-proved
-  // unbounded suffixes silence crisis continuations ("no way out of this
-  // meeting alive"); F3 flagged the unmeasured noun riders (deal/meeting/
-  // agreement/subscription/traffic). Recall-first: bare "no way out",
-  // "of this life/pain", and any continuation after the noun fire.
-  /\bno\s+way\s+out\b(?!\s+of\s+(?:this|the|that|my|our|a|an)\s+(?:contract|lease)\b *(?:$|\n|[.!?,;:…]))/,
+  // Transactional-noun suffix guard (crisis-eval-precision T-005/T-B;
+  // retreated in T-006; end-of-message-bounded in T-008 after review
+  // round 2 F17): ONLY "of <det> contract/lease" — `contract` is the
+  // measured F12 over-fire noun (06-idiom-f12-no-way-out-contract);
+  // `lease` is inferred from the same measured message ("I read the lease
+  // again...") and fixture-pinned, not separately measured. The determiner
+  // class is broader than the measured "this" — determiners are
+  // semantically neutral for the transactional reading. The guard applies
+  // ONLY when the noun ENDS THE MESSAGE (optional trailing punctuation):
+  // round-2 F17 live-proved mid-message punctuation reads as a connector
+  // in distressed typing ("no way out of this contract, i am done with
+  // everything" must fire). Recall-first: bare "no way out", "of this
+  // life/pain", "of the contract of my life", and ANY continuation after
+  // the noun fire.
+  /\bno\s+way\s+out\b(?!\s+of\s+(?:this|the|that|my|our|a|an)\s+(?:contract|lease)\b *[.!?,;:…]* *(?:$|\n))/,
   /\bbetter\s+off\s+if\s+i\s+(?:was|were)\s+gone\b/
 ];
 
