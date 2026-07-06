@@ -233,15 +233,21 @@ var OVERDOSE_TAIL =
   '|last|twice' +
   '|cent(?:er|re)s?|lines?|logs?|volume|training|shifts?)\\b)';
 
-// Shared die-of-idiom suffix guard (crisis-eval-precision T-005/T-A, PM
-// tuning authorization 2026-07-06): "want to die of embarrassment/shame/
-// laughter/boredom/cringe" is the hyperbole idiom, not ideation — measured
-// as a venting over-fire by evals/overfire.js. Enumerated-noun blocklist,
-// recall-first: any other continuation ("want to die tonight", "want to
-// die of grief") keeps firing. Mirrors the awareness/prevention-suffix
-// convention on self-harm/overdose.
+// Die-of-idiom suffix guard (crisis-eval-precision T-005/T-A, PM tuning
+// authorization 2026-07-06; RETREATED to the measured envelope in T-006
+// after adversarial review): ONLY "of embarrassment" — the single noun a
+// measured over-fire covers (05-venting-die-embarrassment) — and ONLY when
+// followed by a clause end or an enumerated benign continuation ("about /
+// after / over / at / because / in front of ..."). Review round-1 F1
+// live-proved that broader noun lists silence real crisis composites
+// ("i want to die of shame. i have a plan." must fire — shame is a core
+// suicidality affect, not an unambiguous idiom), and F2 proved unbounded
+// suffixes eat crisis continuations. Recall-first: any unlisted noun, any
+// unlisted continuation ("of embarrassment and i mean it"), fires.
 var DIE_IDIOM_GUARD =
-  '(?!\\s+of\\s+(?:embarrassment|shame|laughter|boredom|cringe)\\b)';
+  '(?!\\s+of\\s+embarrassment\\b' +
+  '(?: *(?:$|\\n|[.!?,;:…])' +
+  '|\\s+(?:about|after|over|at|because|when|whenever|every|in)\\b))';
 
 // Tier 1: explicit suicidal-ideation / self-harm / method language.
 // Recall-first: within clearly first-person crisis space, prefer to match.
@@ -382,13 +388,16 @@ var TIER2_PATTERNS = [
   /\bnothing\s+(?:left\s+)?to\s+live\s+for\b/,
   /\bno\s+point\s+in\s+(?:living|going\s+on)\b/,
   // Transactional-noun suffix guard (crisis-eval-precision T-005/T-B, PM
-  // tuning authorization 2026-07-06): "no way out of this contract/lease/
-  // deal/meeting/agreement/subscription/traffic" is transactional, not
-  // despair — measured as an F12 over-fire by evals/overfire.js.
-  // Recall-first: the noun list is closed and unambiguous; "no way out of
-  // this life/pain/marriage", bare "no way out", and every unknown
-  // continuation keep firing.
-  /\bno\s+way\s+out\b(?!\s+of\s+(?:this|the|that|my|our|a|an)\s+(?:contract|lease|deal|meeting|agreement|subscription|traffic)\b)/,
+  // tuning authorization 2026-07-06; RETREATED to the measured envelope in
+  // T-006 after adversarial review): ONLY "of <det> contract/lease" — the
+  // nouns the measured F12 over-fire covers (06-idiom-f12-no-way-out-
+  // contract: "no way out of this contract" in a lease-reading message) —
+  // and ONLY when the noun ends the clause. Review round-1 F2 live-proved
+  // unbounded suffixes silence crisis continuations ("no way out of this
+  // meeting alive"); F3 flagged the unmeasured noun riders (deal/meeting/
+  // agreement/subscription/traffic). Recall-first: bare "no way out",
+  // "of this life/pain", and any continuation after the noun fire.
+  /\bno\s+way\s+out\b(?!\s+of\s+(?:this|the|that|my|our|a|an)\s+(?:contract|lease)\b *(?:$|\n|[.!?,;:…]))/,
   /\bbetter\s+off\s+if\s+i\s+(?:was|were)\s+gone\b/
 ];
 

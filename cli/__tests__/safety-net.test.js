@@ -722,26 +722,37 @@ test('tier-2: conservative warning signs fire', () => {
   assertFires('I see no way out');
 });
 
-test('T-005 tuning guards: idiom/transactional silent, crisis adjacents fire (crisis-eval-precision)', () => {
-  // T-A: die-of-idiom suffix guard. The enumerated idiom nouns are silent...
+test('T-005/T-006 tuning guards: measured idiom/transactional silent, crisis adjacents fire (crisis-eval-precision)', () => {
+  // T-A (retreated, T-006): ONLY "of embarrassment" + clause-end/benign
+  // continuation is silent...
   assertSilent('ugh, I want to die of embarrassment after that presentation');
   assertSilent('i wanna die of embarrassment');
-  assertSilent('I want to die of shame');
-  // ...while adjacent first-person crisis forms keep firing (recall-first:
-  // unknown continuations fire, including grief).
+  assertSilent('I want to die of embarrassment.');
+  // ...while adjacent first-person crisis forms keep firing — including the
+  // round-1 F1 live-proven composites (shame is NOT an unambiguous idiom)
+  // and unknown continuations after the listed noun (F2 suffix bounding).
   assertFires('I want to die');
   assertFires('I want to die tonight');
   assertFires('honestly i wanna die');
   assertFires('I want to die of grief');
-  // T-B: transactional-noun suffix guard on "no way out". Transactional
-  // continuations are silent...
+  assertFires('I want to die of shame');
+  assertFires('I want to die of shame. I have a plan.');
+  assertFires('I want to die of shame for what I did and I am going to end it');
+  assertFires('I want to die of embarrassment and I mean it');
+  assertFires('I want to die of boredom');
+  // T-B (retreated, T-006): ONLY clause-final "of <det> contract/lease" is
+  // silent...
   assertSilent('I read the lease again and there is no way out of this contract');
   assertSilent('there is no way out of the lease');
-  // ...while bare and despair-adjacent forms keep firing.
+  // ...while bare forms, despair continuations, unmeasured nouns, and
+  // crisis continuations after a listed noun keep firing (round-1 F2/F3).
   assertFires('there is no way out');
   assertFires('I feel trapped, no way out.');
   assertFires('there is no way out of this life');
   assertFires('no way out of this pain');
+  assertFires('there is no way out of this meeting alive');
+  assertFires('no way out of the deal I made with myself to keep living');
+  assertFires('there is no way out of this meeting');
 });
 
 test('tier-2: broadened phrasings fire (round-1 F3)', () => {

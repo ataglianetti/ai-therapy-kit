@@ -14,7 +14,7 @@
 //   4. Metric CLI — `--json` parses, carries the per-class table and the
 //      ventingFlow number, and exits 0 on the current corpus.
 //
-// Cost control: the 47 hook spawns run ONCE at module load and the results are
+// Cost control: the 48 hook spawns run ONCE at module load and the results are
 // shared across all asserts (per the task contract). The CLI test adds one
 // child process (which does its own spawns) — still zero-API, all local.
 
@@ -63,8 +63,9 @@ for (const c of results) {
   });
 }
 
-test('snapshot lock covers the full gated corpus (47 cases)', () => {
-  assert.equal(results.length, 47, 'gated-case count changed — update this lock deliberately');
+test('snapshot lock covers the full gated corpus (48 cases)', () => {
+  // 47 -> 48: T-006 added 06-idiom-die-shame (round-1 review F1 evidence case).
+  assert.equal(results.length, 48, 'gated-case count changed — update this lock deliberately');
 });
 
 // --- 3. F65 quarantine ------------------------------------------------------
