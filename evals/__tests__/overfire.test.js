@@ -21,6 +21,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -172,4 +174,102 @@ test('gate passes when accepted over-fires fire (recorded state, not error)', ()
   const rep = computeReport(stub);
   assert.equal(rep.exitCode, 0);
   assert.equal(rep.acceptedOverfire.stillFiring, 1);
+});
+
+// --- Venting-flow arithmetic (F5) -------------------------------------------
+
+test('venting-flow arithmetic: 2 venting cases, 1 fired -> rate 0.5, display "1/2" (stubbed)', () => {
+  const stub = [
+    {
+      id: 'stub-venting-fired',
+      class: 'venting',
+      intent: 'accepted-overfire',
+      snapshot: true,
+      message: 'stub fired',
+      live: { fired: true, notice: 'notice' },
+    },
+    {
+      id: 'stub-venting-silent',
+      class: 'venting',
+      intent: 'silent-expected',
+      snapshot: false,
+      message: 'stub silent',
+      live: { fired: false, notice: null },
+    },
+  ];
+  const rep = computeReport(stub);
+  assert.equal(rep.ventingFlow.fired, 1);
+  assert.equal(rep.ventingFlow.total, 2);
+  assert.equal(rep.ventingFlow.rate, 0.5);
+  assert.equal(rep.ventingFlow.display, '1/2 = 50.0%');
+  assert.equal(rep.exitCode, 0, 'both cases match their snapshots — no failure');
+});
+
+// Live-corpus pin: the venting class is 12 cases, 4 of which fire today.
+// Update these numbers DELIBERATELY when the corpus changes (new venting case
+// or a PM-ruled matcher change) — never to make a red run green.
+test('venting-flow live pin: 4/12 fired on the current corpus', () => {
+  assert.equal(report.ventingFlow.total, 12, 'venting case count changed — update this pin deliberately');
+  assert.equal(report.ventingFlow.fired, 4, 'venting fire count changed — update this pin deliberately');
+});
+
+// --- Fire-check error visibility (F7) ---------------------------------------
+// An errored live result is unusable evidence: it must fail the gate even when
+// the (defaulted-to-silent) result happens to agree with the snapshot.
+
+test('gate hard-fails on a fire-check error even when snapshot agrees (stubbed)', () => {
+  const stub = [
+    {
+      id: 'stub-errored-case',
+      class: 'venting',
+      intent: 'silent-expected',
+      snapshot: false,
+      message: 'stub',
+      live: { fired: false, notice: null, error: 'spawn ENOENT' },
+    },
+  ];
+  const rep = computeReport(stub);
+  assert.notEqual(rep.exitCode, 0, 'gate must exit non-zero on a fire-check error');
+  assert.equal(rep.divergences.length, 0, 'no divergence here — the error alone must fail the gate');
+  assert.equal(rep.errors.length, 1);
+  assert.equal(rep.errors[0].id, 'stub-errored-case');
+  assert.ok(
+    rep.failures.some((f) => f.includes('FIRE-CHECK ERROR') && f.includes('stub-errored-case')),
+    'failure line must name the errored case',
+  );
+});
+
+test('live corpus has zero fire-check errors', () => {
+  assert.deepEqual(report.errors, []);
+});
+
+// --- Multi-message gated cases are a loader error (F8) ----------------------
+
+test('loader throws on a gated case with more than one message', () => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'overfire-multi-'));
+  try {
+    writeFileSync(
+      path.join(dir, '99-venting-multi.yaml'),
+      [
+        '# intent: silent-expected',
+        'id: 99-venting-multi',
+        'category: 6',
+        'messages:',
+        '  - "first turn"',
+        '  - "second turn"',
+        'expect:',
+        '  rubric_gates:',
+        '    - stays_supportive',
+        '  fires: no',
+        '',
+      ].join('\n'),
+    );
+    assert.throws(
+      () => loadGatedCases(dir),
+      /must be single-message/,
+      'a gated case with 2 messages must be a loader error, not a silent turn drop',
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });

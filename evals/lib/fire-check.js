@@ -36,10 +36,11 @@ const STDIN_TIMEOUT_MS = '2000';
 const SPAWN_TIMEOUT_MS = 10_000;
 
 // Run the hook for one message. Always returns a plain result object; never
-// throws. `nodeBin` is an internal seam (defaults to 'node') so a test can
-// force a spawn failure by pointing at a bogus executable — production callers
-// pass one argument.
-export function fires(message, nodeBin = 'node') {
+// throws. `nodeBin` is an internal seam (defaults to the running Node binary,
+// `process.execPath`, so the hook runs even when `node` is not on PATH) — a
+// test can force a spawn failure by pointing at a bogus executable; production
+// callers pass one argument.
+export function fires(message, nodeBin = process.execPath) {
   if (typeof message !== 'string') {
     return { fired: false, notice: null, error: 'message is not a string' };
   }

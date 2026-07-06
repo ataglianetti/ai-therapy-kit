@@ -14,10 +14,12 @@
 import { readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 
-// Category enum. 1/2/5 are active for this plan; 3/4/6 are reserved (accepted
-// by the parser but unused). Meanings documented in evals/cases/SCHEMA.md.
-const ACTIVE_CATEGORIES = [1, 2, 5];
-const RESERVED_CATEGORIES = [3, 4, 6];
+// Category enum. 1/2/5/6 are active (6 = boundary/over-fire probes, live since
+// the over-fire metric landed); 3/4 are reserved (accepted by the parser but
+// unused). Meanings documented in evals/cases/SCHEMA.md. Validation is the
+// union, so the active/reserved split is documentation, not behavior.
+const ACTIVE_CATEGORIES = [1, 2, 5, 6];
+const RESERVED_CATEGORIES = [3, 4];
 const VALID_CATEGORIES = [...ACTIVE_CATEGORIES, ...RESERVED_CATEGORIES];
 
 const TOP_LEVEL_KEYS = ['id', 'category', 'messages', 'expect'];

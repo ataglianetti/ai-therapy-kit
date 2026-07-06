@@ -41,6 +41,8 @@ jobs:
           fi
       - name: Run unit tests
         run: npm test
+      - name: Run eval regression gate
+        run: npm run test:evals
       - name: Smoke test CLI
         run: |
           node bin/inner-dialogue.js --version

@@ -21,8 +21,11 @@
 //       06-family-mom-thoughts -> family; 05-venting-job -> venting.
 //
 // Exit semantics (CLI):
-//   non-zero if (a) any must-fire case is silent, or (b) any case's live
-//   result diverges from its `expect.fires` snapshot. Accepted over-fires
+//   non-zero if (a) any must-fire case is silent, (b) any case's live
+//   result diverges from its `expect.fires` snapshot, or (c) the fire-check
+//   reported an error for any gated case (spawn failure, timeout, bad hook
+//   output) — an errored result is unusable evidence, so it fails the gate
+//   even when it happens to agree with the snapshot. Accepted over-fires
 //   firing is the recorded state, not an error. Exit 0 otherwise.
 //
 // Usage:
@@ -87,12 +90,19 @@ export function loadGatedCases(casesDir = CASES_DIR) {
         `${filePath}: unknown intent "${intent}" (allowed: ${VALID_INTENTS.join(', ')})`,
       );
     }
+    // Gated cases are single-message by contract: the gate runs exactly one
+    // message through the hook, so a multi-message gated case would silently
+    // drop turns. Loader error (exit 2), same path as a missing intent.
+    if (parsed.messages.length > 1) {
+      throw new Error(
+        `${filePath}: gated case has ${parsed.messages.length} messages — cases with expect.fires must be single-message (the gate runs only messages[0])`,
+      );
+    }
     out.push({
       id: parsed.id,
       class: classOf(parsed.id),
       intent,
       snapshot: parsed.expect.fires,
-      // These are all single-message cases; the gate runs the first message.
       message: parsed.messages[0],
       file: f,
     });
@@ -176,6 +186,14 @@ export function computeReport(results) {
     ...(r.live.error ? { error: r.live.error } : {}),
   }));
 
+  // Fire-check errors (spawn failure, timeout, malformed hook output) make the
+  // live result unusable evidence — a FAILURE regardless of snapshot agreement,
+  // so an errored "silent" can never quietly pass as a real silence.
+  const errors = of_((r) => r.live.error !== undefined).map((r) => ({
+    id: r.id,
+    error: r.live.error,
+  }));
+
   const failures = [];
   for (const id of mustFire.silentIds) {
     failures.push(`MUST-FIRE SILENT: ${id} — first-person crisis phrase did not fire`);
@@ -183,6 +201,11 @@ export function computeReport(results) {
   for (const d of divergences) {
     failures.push(
       `SNAPSHOT DIVERGENCE: ${d.id} — expect.fires=${d.expected ? 'yes' : 'no'}, live=${d.actual ? 'fired' : 'silent'}${d.error ? ` (error: ${d.error})` : ''}`,
+    );
+  }
+  for (const e of errors) {
+    failures.push(
+      `FIRE-CHECK ERROR: ${e.id} — ${e.error} (live result is unusable; fails regardless of snapshot agreement)`,
     );
   }
 
@@ -195,8 +218,12 @@ export function computeReport(results) {
     mustFire,
     knownSilences,
     divergences,
+    errors,
     failures,
-    exitCode: mustFire.silentIds.length > 0 || divergences.length > 0 ? 1 : 0,
+    exitCode:
+      mustFire.silentIds.length > 0 || divergences.length > 0 || errors.length > 0
+        ? 1
+        : 0,
     cases: results.map((r) => ({
       id: r.id,
       class: r.class,
@@ -262,6 +289,7 @@ function printHuman(report) {
       `; known-silence-F65: ${report.knownSilences.length ? f65 : 'none'}`,
   );
   out.push(`Snapshot divergences: ${report.divergences.length}`);
+  out.push(`Fire-check errors: ${report.errors.length}`);
   if (report.failures.length) {
     out.push('');
     for (const f of report.failures) out.push(`FAIL ${f}`);
@@ -277,7 +305,8 @@ function main(argv) {
     if (arg === '--json') json = true;
     else {
       process.stderr.write(`unknown argument: ${arg}\nusage: node evals/overfire.js [--json]\n`);
-      process.exit(2);
+      process.exitCode = 2;
+      return;
     }
   }
   let report;
@@ -285,14 +314,17 @@ function main(argv) {
     report = computeReport(runLive(loadGatedCases()));
   } catch (err) {
     process.stderr.write(`overfire: ${err.message}\n`);
-    process.exit(2);
+    process.exitCode = 2;
+    return;
   }
   if (json) {
     process.stdout.write(JSON.stringify(report, null, 2) + '\n');
   } else {
     printHuman(report);
   }
-  process.exit(report.exitCode);
+  // Set exitCode rather than calling process.exit() so stdout/stderr writes
+  // flush before the process ends (exit() can truncate piped output).
+  process.exitCode = report.exitCode;
 }
 
 const invokedDirectly =
