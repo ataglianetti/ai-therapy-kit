@@ -88,8 +88,18 @@ function tokenize(text) {
 function readBlockList(tokens, start, parent) {
   const items = [];
   let i = start;
+  // The first item fixes the list's indent; every sibling must match it. This
+  // mirrors the `baseIndent` equality check parseExpectBlock uses for keys.
+  let itemIndent = null;
   while (i < tokens.length && tokens[i].indent > parent.indent) {
     const tok = tokens[i];
+    if (itemIndent === null) {
+      itemIndent = tok.indent;
+    } else if (tok.indent !== itemIndent) {
+      throw new Error(
+        `Line ${tok.lineNo}: inconsistent list-item indentation under "${parent.key}" (expected ${itemIndent} spaces, got ${tok.indent})`,
+      );
+    }
     const body = tok.trimmed;
     if (!body.startsWith('-')) {
       throw new Error(
@@ -108,7 +118,7 @@ function readBlockList(tokens, start, parent) {
   }
   if (items.length === 0) {
     throw new Error(
-      `Line ${parent.lineNo}: list "${parent.key}" must have at least one item`,
+      `Line ${parent.lineNo}: list "${parent.key}" has no items — list items must be indented more than the key`,
     );
   }
   return { items, next: i };

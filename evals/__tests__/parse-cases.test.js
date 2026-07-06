@@ -307,6 +307,57 @@ expect:
 });
 
 // ---------------------------------------------------------------------------
+// List-item indentation consistency (F5)
+// ---------------------------------------------------------------------------
+
+test('over-indented sibling list item throws instead of being absorbed', () => {
+  assert.throws(
+    () =>
+      parseCase(`id: x
+category: 1
+messages:
+  - "first"
+      - "over-indented"
+expect:
+  rubric_gates:
+    - g
+`),
+    /inconsistent list-item indentation under "messages"/,
+  );
+});
+
+test('list at same indent as its key throws the improved empty-list message', () => {
+  assert.throws(
+    () =>
+      parseCase(`id: x
+category: 1
+messages:
+- "same indent as key"
+expect:
+  rubric_gates:
+    - g
+`),
+    /list "messages" has no items — list items must be indented more than the key/,
+  );
+});
+
+test('correctly-indented multi-item list still parses', () => {
+  const c = parseCase(`id: x
+category: 1
+messages:
+  - "one"
+  - "two"
+  - "three"
+expect:
+  rubric_gates:
+    - a
+    - b
+`);
+  assert.deepEqual(c.messages, ['one', 'two', 'three']);
+  assert.deepEqual(c.expect.rubric_gates, ['a', 'b']);
+});
+
+// ---------------------------------------------------------------------------
 // parseFile + --check CLI
 // ---------------------------------------------------------------------------
 
