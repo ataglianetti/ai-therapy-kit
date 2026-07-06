@@ -38,8 +38,14 @@ export const MOCK_SESSION_ID = 'mock-session-0000';
  * Build the spawn plan for a subject invocation. Pure — no side effects — so
  * tests can assert the exact command/args/cwd without spawning.
  *
- * Fresh turn:   claude -p <message>
- * Resume turn:  claude --resume <sessionId> -p <message>
+ * We always request structured output (`--output-format json`) so we can parse
+ * BOTH the assistant response text AND the session id from a single object.
+ * The session id is what threads multi-turn cases: without it, turn 2 would
+ * spawn a fresh, context-less session and the crisis signal that accumulates
+ * across turns would be lost.
+ *
+ * Fresh turn:   claude -p <message> --output-format json
+ * Resume turn:  claude --resume <sessionId> -p <message> --output-format json
  *
  * @param {object} opts
  * @param {string} opts.message           prompt to send
@@ -56,7 +62,7 @@ export function subjectSpawnPlan(
   if (resumeSessionId) {
     args.push('--resume', resumeSessionId);
   }
-  args.push('-p', message);
+  args.push('-p', message, '--output-format', 'json');
   return {
     command: 'claude',
     args,
@@ -64,6 +70,38 @@ export function subjectSpawnPlan(
     // win32: `claude` is a .cmd shim spawnSync can't resolve without a shell.
     shell: platform === 'win32',
   };
+}
+
+/**
+ * Parse a `claude -p --output-format json` result payload.
+ *
+ * `claude` 2.1.x emits a single JSON object of shape:
+ *   { type:"result", subtype:"success", is_error:false,
+ *     result:"<assistant text>", session_id:"<uuid>", ... }
+ * We read `result` (assistant text) and `session_id` (thread key). A payload
+ * that doesn't parse, is flagged `is_error`, or is missing `session_id` yields
+ * a null result — the caller fails closed rather than grading a decapitated
+ * multi-turn case.
+ *
+ * @param {string} raw stdout from the CLI
+ * @returns {{response:string, sessionId:string}|null}
+ */
+export function parseSubjectResult(raw) {
+  let obj;
+  try {
+    obj = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  if (!obj || typeof obj !== 'object' || obj.is_error === true) {
+    return null;
+  }
+  const sessionId = typeof obj.session_id === 'string' ? obj.session_id : '';
+  const response = typeof obj.result === 'string' ? obj.result : '';
+  if (!sessionId) {
+    return null;
+  }
+  return { response, sessionId };
 }
 
 /**
@@ -124,11 +162,26 @@ export function runSubject({ cwd, message, resumeSessionId, mock } = {}) {
   }
 
   const raw = result.stdout || '';
+  const parsed = parseSubjectResult(raw);
+
+  // Fail closed: if we can't recover a session id from the structured output
+  // (older CLI, unexpected shape, parse failure), we must NOT hand back a
+  // context-less turn. A multi-turn case would then thread nothing and be
+  // graded on a decapitated turn-2. Surface a structured error instead so the
+  // case is skipped/failed with a clear message rather than silently mis-scored.
+  if (!parsed) {
+    return spawnError(
+      plan,
+      'ENOSESSION',
+      'could not parse a session id from `claude -p --output-format json` ' +
+        'output — refusing to grade a multi-turn case on an unthreaded turn ' +
+        `(raw prefix: ${JSON.stringify(raw.slice(0, 200))})`
+    );
+  }
+
   return {
-    response: raw.trim(),
-    // Single-turn today does not parse a session id out of plain `-p` output;
-    // structured so a future multi-turn mode can populate it. Null, not thrown.
-    sessionId: resumeSessionId || null,
+    response: parsed.response.trim(),
+    sessionId: parsed.sessionId,
     raw,
     plan,
     mock: false,

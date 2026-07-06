@@ -133,13 +133,22 @@ export function prepFixture({ hook, arm, fixtureDir } = {}) {
 
   const src = fixtureDir || DEFAULT_FIXTURE_DIR;
   const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'ceval-'));
-  fs.cpSync(src, cwd, { recursive: true });
 
-  if (hook === 'off') {
-    const settingsPath = path.join(cwd, SETTINGS_REL_PATH);
-    if (fs.existsSync(settingsPath)) {
-      removeSafetyNetHook(settingsPath);
+  // Once the temp dir exists, any failure before we return a cleanup handle
+  // would otherwise leak it. Guard the rest of prep so a throw (e.g. cpSync
+  // fails, bad settings.json) removes the just-created dir before rethrowing.
+  try {
+    fs.cpSync(src, cwd, { recursive: true });
+
+    if (hook === 'off') {
+      const settingsPath = path.join(cwd, SETTINGS_REL_PATH);
+      if (fs.existsSync(settingsPath)) {
+        removeSafetyNetHook(settingsPath);
+      }
     }
+  } catch (err) {
+    fs.rmSync(cwd, { recursive: true, force: true });
+    throw err;
   }
 
   const result = {

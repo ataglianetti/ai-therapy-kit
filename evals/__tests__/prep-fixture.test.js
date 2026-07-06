@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 
 import { prepFixture } from '../lib/prep-fixture.js';
@@ -133,4 +134,26 @@ test('bad hook value throws', () => {
 
 test('bad arm value throws', () => {
   assert.throws(() => prepFixture({ hook: 'on', arm: 'stale' }), /invalid arm/);
+});
+
+test('a prep failure after mkdtemp leaves no leaked temp dir', () => {
+  // Force the copy step to fail by pointing at a non-existent source fixture.
+  // mkdtempSync will already have created the temp dir; prepFixture must remove
+  // it before rethrowing so no ceval-* dir leaks.
+  const missingSrc = path.join(os.tmpdir(), 'ceval-does-not-exist-src-xyz');
+  assert.equal(fs.existsSync(missingSrc), false, 'precondition: source is absent');
+
+  const before = new Set(
+    fs.readdirSync(os.tmpdir()).filter((n) => n.startsWith('ceval-'))
+  );
+
+  assert.throws(
+    () => prepFixture({ hook: 'on', arm: 'fresh', fixtureDir: missingSrc }),
+    /ENOENT|no such file/i
+  );
+
+  const after = fs
+    .readdirSync(os.tmpdir())
+    .filter((n) => n.startsWith('ceval-') && !before.has(n));
+  assert.deepEqual(after, [], `no new ceval-* temp dir should leak, saw: ${after}`);
 });

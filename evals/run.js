@@ -216,15 +216,6 @@ function run(argv, out = process.stdout, err = process.stderr) {
     );
   }
 
-  // Prep exactly one temp fixture for this run (arm + hook). try/finally below
-  // guarantees cleanup even on error.
-  let fixture;
-  try {
-    fixture = prepFixture({ hook: flags.hook, arm: flags.arm });
-  } catch (e) {
-    throw new UsageError(`fixture prep failed: ${e.message}`);
-  }
-
   // Cache rubric text per category so we don't re-read for every case/rep.
   const rubricCache = new Map();
   function rubricFor(category) {
@@ -240,8 +231,18 @@ function run(argv, out = process.stdout, err = process.stderr) {
     return rubricCache.get(category);
   }
 
+  // Prep exactly one temp fixture for this run (arm + hook) INSIDE the try so a
+  // throw after prep (or during prep, after the temp dir exists) still cleans
+  // up. fixture stays undefined until prep returns, so the finally guards on it.
   const rows = [];
+  let fixture;
   try {
+    try {
+      fixture = prepFixture({ hook: flags.hook, arm: flags.arm });
+    } catch (e) {
+      throw new UsageError(`fixture prep failed: ${e.message}`);
+    }
+
     for (const caseObj of cases) {
       let mechPass = 0;
       let judgePass = 0;
@@ -282,7 +283,7 @@ function run(argv, out = process.stdout, err = process.stderr) {
       });
     }
   } finally {
-    fixture.cleanup();
+    if (fixture) fixture.cleanup();
   }
 
   printSummary(out, { flags, judgeCfg, rows });
