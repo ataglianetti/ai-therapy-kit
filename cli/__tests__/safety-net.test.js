@@ -446,9 +446,10 @@ test('tier-1: apostrophe-less first-person clause rescue fires (round-5 F51)', (
 test('negatives: adjacent pronoun-possessive thoughts stay silent (round-6 F53 / round-8 F58)', () => {
   // The only possessive-of-other guard left after the PM asymmetric-close
   // ruling (2026-07-05): his/her/their/your immediately before the keyword.
-  assertSilent('his suicidal thoughts scared his wife');
   assertSilent('her suicidal ideation');
   assertSilent('their suicidal thoughts');
+  // round-8 F66: `your` had no fixture; the guard covers it via TP_DET_THIRD.
+  assertSilent('your suicidal thoughts');
 });
 
 test('tier-1: first-person forms behind the removed round-6 guards fire (round-8 F57/F58)', () => {
@@ -468,6 +469,12 @@ test('tier-1: first-person forms behind the removed round-6 guards fire (round-8
   assertFires('i never told her the suicidal thoughts got this bad');
   assertFires('since i lost her the suicidal thoughts came back');
   assertFires('i lied to her about the suicidal thoughts');
+  // round-8 F63: the retained adjacency guard used bare `\s`, which matched
+  // a newline and read "her\nsuicidal" as a possessive across a clause
+  // boundary normalize() preserves. Fixed to `[^\S\n]` — these fire.
+  assertFires('i cant tell her\nsuicidal thoughts are getting worse');
+  assertFires('i cant tell her\nthese suicidal thoughts are getting worse');
+  assertFires('i talked to her about suicidal thoughts i keep having');
 });
 
 test('tier-1: genitive and modified-possessive over-fires accepted (round-8 F57/F58)', () => {
@@ -512,10 +519,26 @@ test('tier-1: overdose help imperatives with kinship, service, and bare tails fi
 
 test('negatives: professional overdose-call continuations stay silent (round-6 F54 / round-8 F59)', () => {
   // Boundary of the narrowed blocklist: bare preposition/adverb and
-  // compound-noun continuations only.
-  assertSilent('i took an overdose call at work today');
+  // compound-noun continuations only. (round-8 F66: the byte-duplicate
+  // "at work today" pin removed — kept the round-4 F44 original.)
   assertSilent('i handled an overdose call yesterday');
   assertSilent('the overdose call center is hiring');
+});
+
+test('tier-1: first-person overdose imperatives behind stripped blocklist tokens fire (round-8 F62)', () => {
+  // PM option-A ruling (2026-07-05): the surviving blocklist tokens
+  // during|while|today|tonight|once|every silenced first-person overdose
+  // imperatives. Stripped — these must fire.
+  assertFires('i overdosed call every hotline');
+  assertFires('gonna overdose call every friend i have');
+  assertFires('i overdosed call once you get this');
+  assertFires('im overdosing call tonight please');
+  assertFires('i overdosed call today or itll be too late');
+  assertFires('i overdosed call during the night if you want');
+  assertFires('i overdosed call while you still can');
+  // The pinned professional silents that survive the strip (at/yesterday/
+  // cent) stay covered by the round-4 F44 and round-8 F59 negative tests
+  // above — not re-pinned here to avoid the byte-duplicates F66 removed.
 });
 
 test('tier-1: determiner-led overdose-call continuations fire (round-8 F59)', () => {
@@ -909,7 +932,11 @@ test('pattern hygiene: every pattern source is lowercase (round-1 F14)', () => {
     `expected to extract pattern sources, got ${sources.length}`
   );
   for (const src of sources) {
-    assert.equal(src, src.toLowerCase(), `pattern source is not lowercase: ${src}`);
+    // Regex metacharacter shorthands are case-significant and can never
+    // match a literal character, so their uppercase forms (\S \D \W \B) are
+    // exempt — e.g. the `[^\S\n]` idiom normalize() uses (round-8 F63).
+    const scrub = src.replace(/\\[SDWB]/g, '');
+    assert.equal(scrub, scrub.toLowerCase(), `pattern source is not lowercase: ${src}`);
   }
 });
 

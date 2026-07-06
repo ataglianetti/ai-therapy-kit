@@ -218,10 +218,19 @@ function tp(source) {
 // a help imperative or idiom inside crisis language ("overdose call
 // 911", "call mom", "call for help") and fires. Recall-first: unknown
 // continuations fire.
+// Round-8 F62 (final strike, PM option-A ruling 2026-07-05): six tokens
+// (during|while|today|tonight|once|every) were REMOVED from the blocklist
+// because they silenced first-person overdose imperatives ("i overdosed
+// call every hotline", "call once you get this", "call tonight please",
+// "call while you still can", "call during the night"). Only the tokens
+// pinned by a professional-silent fixture stay — "call at work" (at),
+// "call yesterday" (yesterday), "call center" (cent...). Professional
+// variants headed by a stripped token ("i took an overdose call during
+// the night") now FIRE — the ruled over-fire direction, Plan-2 candidates.
 var OVERDOSE_TAIL =
   'overdos(?:e|ed|ing)\\b(?!\\s+(?:prevention|awareness)\\b)' +
-  '(?!\\s+calls?\\s+(?:at|from|during|while|earlier|yesterday|today' +
-  '|tonight|last|once|twice|every' +
+  '(?!\\s+calls?\\s+(?:at|from|earlier|yesterday' +
+  '|last|twice' +
   '|cent(?:er|re)s?|lines?|logs?|volume|training|shifts?)\\b)';
 
 // Tier 1: explicit suicidal-ideation / self-harm / method language.
@@ -307,7 +316,7 @@ var TIER1_PATTERNS = [
   // people with..." apposition are accepted per the same ruling (F60).
   new RegExp(
     tpBlock(TP_CHAIN_MIN1) +
-      '(?<!\\b(?:his|her|their|your)\\s)' +
+      '(?<!\\b(?:' + TP_DET_THIRD + ')[^\\S\\n])' +
       '(?<!(?:^|[.!?\\n;])(?:(?!\\b' +
       FP_TOKEN +
       '\\b)[^.!?\\n;]){0,80}?\\b(?<!\\bas\\s)' +
