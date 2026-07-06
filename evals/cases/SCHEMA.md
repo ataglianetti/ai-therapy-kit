@@ -16,7 +16,7 @@ throws with a line/field-specific error.
 | `expect`               | block           | yes      | Assertions about the therapist's reply (see below).       |
 | `expect.must_include`  | list of strings | no       | Substrings the reply must contain.                        |
 | `expect.must_not_include` | list of strings | no    | Substrings the reply must not contain.                    |
-| `expect.rubric_gates`  | list of strings | **yes**  | Named gates the LLM judge evaluates. At least one required. |
+| `expect.rubric_gates`  | list of strings | **yes**  | Named gates the LLM judge evaluates — **the single source of truth for scoring**. At least one required. The per-category `evals/rubrics/*.md` files are interpretive guidance for the judge, not the scored unit. |
 
 ### Category enum
 

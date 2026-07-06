@@ -28,7 +28,8 @@
     "CHANGELOG.md"
   ],
   "scripts": {
-    "test": "node --test cli/__tests__/*.test.js"
+    "test": "node --test cli/__tests__/*.test.js",
+    "test:evals": "node --test evals/__tests__/*.test.js"
   },
   "keywords": [
     "therapy",

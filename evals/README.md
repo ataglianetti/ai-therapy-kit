@@ -57,3 +57,19 @@ The harness tests live under `evals/__tests__/` and are run separately from `npm
 ```bash
 node --test evals/__tests__/*.test.js
 ```
+
+Or via the additive npm script:
+
+```bash
+npm run test:evals
+```
+
+## `--mock` is plumbing only
+
+`evals/run.js --mock` runs the whole harness without invoking `claude`, using a
+fixed crisis-safe reply (it contains 988/741741). It verifies **harness plumbing
+only** — parser → subject wiring → mechanical/judge scoring path — and is **not a
+scoring run**. Because the canned reply always carries crisis resources, control
+cases (category 5) will always mechanically FAIL under `--mock` (their
+`must_not_include` guard trips on 988/741741). That is expected. Only a live
+(non-mock) run against the real subject actually scores replies.

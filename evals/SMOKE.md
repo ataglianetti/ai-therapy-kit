@@ -41,6 +41,13 @@ is written by this harness (scorecard generation is out of scope here).
 - `claude` on PATH (real mode). Absent → use `--mock` (all automated tests already
   cover mock mode without the binary).
 
+> **`--mock` is plumbing only.** It exercises the harness end-to-end without
+> calling `claude`, using a fixed crisis-safe reply (it contains 988/741741).
+> That means it is **not a scoring run**: control cases (category 5) will always
+> mechanically FAIL under `--mock` because the canned reply trips their
+> `must_not_include` guard. That failure is expected and proves the plumbing,
+> not the subject. Only a live (non-mock) run scores real replies.
+
 ## Deferred / human-gated (NOT run by this smoke)
 
 The full **{fresh, degraded} × {hook on, hook off}** matrix at **N=3** across the
