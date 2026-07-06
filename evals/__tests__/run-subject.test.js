@@ -209,6 +209,60 @@ test('parseSubjectResult: null when is_error is true', () => {
 });
 
 // ---------------------------------------------------------------------------
+// Preamble / trailer tolerance — a stray banner line must not fail-close the
+// whole live suite; we still locate and parse the JSON result object.
+// ---------------------------------------------------------------------------
+
+test('parseSubjectResult: tolerates a leading banner line before the JSON', () => {
+  const raw = 'npm notice New version of claude available!\n' + SAMPLE_RESULT_JSON;
+  const parsed = parseSubjectResult(raw);
+  assert.ok(parsed, 'parsed non-null despite preamble');
+  assert.equal(parsed.response, 'I hear you. Tell me more about what that felt like.');
+  assert.equal(parsed.sessionId, '75b13ac7-ca1c-4f6f-8acc-b5809c6f3178');
+});
+
+test('parseSubjectResult: tolerates a trailing warning line after the JSON', () => {
+  const raw = SAMPLE_RESULT_JSON + '\n[deprecation] --foo will be removed in 3.0\n';
+  const parsed = parseSubjectResult(raw);
+  assert.ok(parsed, 'parsed non-null despite trailer');
+  assert.equal(parsed.response, 'I hear you. Tell me more about what that felt like.');
+  assert.equal(parsed.sessionId, '75b13ac7-ca1c-4f6f-8acc-b5809c6f3178');
+});
+
+test('parseSubjectResult: tolerates both a preamble and a trailer', () => {
+  const raw =
+    'auto-update: fetching...\n' +
+    SAMPLE_RESULT_JSON +
+    '\nwarning: something benign\n';
+  const parsed = parseSubjectResult(raw);
+  assert.ok(parsed, 'parsed non-null despite preamble + trailer');
+  assert.equal(parsed.sessionId, '75b13ac7-ca1c-4f6f-8acc-b5809c6f3178');
+});
+
+test('parseSubjectResult: brace inside a preamble line does not derail the scan', () => {
+  // A preamble that itself contains braces (e.g. a log line) must not be
+  // mistaken for the result object — we take the LAST balanced top-level {...}.
+  const raw = 'ctx { partial: true } loading\n' + SAMPLE_RESULT_JSON;
+  const parsed = parseSubjectResult(raw);
+  assert.ok(parsed, 'parsed non-null');
+  assert.equal(parsed.sessionId, '75b13ac7-ca1c-4f6f-8acc-b5809c6f3178');
+});
+
+test('parseSubjectResult: tolerance still fails closed with a preamble but no session_id', () => {
+  const noSid = JSON.stringify({ result: 'hi', is_error: false });
+  assert.equal(parseSubjectResult('update notice\n' + noSid), null);
+});
+
+test('parseSubjectResult: tolerance still fails closed with a preamble but is_error:true', () => {
+  const errored = JSON.stringify({ result: 'x', session_id: 'abc', is_error: true });
+  assert.equal(parseSubjectResult('update notice\n' + errored), null);
+});
+
+test('parseSubjectResult: genuinely unparseable output with braces still returns null', () => {
+  assert.equal(parseSubjectResult('banner\n{ this is not json }\nfooter'), null);
+});
+
+// ---------------------------------------------------------------------------
 // Mock 2-turn threading — turn 2 resumes turn 1's session id (no spawn)
 // ---------------------------------------------------------------------------
 

@@ -83,16 +83,19 @@ export function subjectSpawnPlan(
  * a null result — the caller fails closed rather than grading a decapitated
  * multi-turn case.
  *
+ * Tolerance: real `claude` output can carry a stray non-JSON preamble or
+ * trailer line (auto-update notice, deprecation warning). A strict
+ * whole-buffer parse would fail-close the entire live suite on one such line.
+ * So we first try the trimmed buffer, then fall back to locating the LAST
+ * balanced top-level `{...}` object in the stream and parsing that. This only
+ * makes locating the JSON robust — every fail-closed condition below
+ * (unparseable, `is_error:true`, missing `session_id`) is preserved exactly.
+ *
  * @param {string} raw stdout from the CLI
  * @returns {{response:string, sessionId:string}|null}
  */
 export function parseSubjectResult(raw) {
-  let obj;
-  try {
-    obj = JSON.parse(raw);
-  } catch {
-    return null;
-  }
+  const obj = extractResultObject(raw);
   if (!obj || typeof obj !== 'object' || obj.is_error === true) {
     return null;
   }
@@ -102,6 +105,72 @@ export function parseSubjectResult(raw) {
     return null;
   }
   return { response, sessionId };
+}
+
+/**
+ * Locate and parse the result JSON object out of raw stdout, tolerant of a
+ * leading/trailing non-JSON line. Returns the parsed object, or null if none
+ * is found. Stdlib only, no regex, no deps.
+ *
+ * Strategy:
+ *   1. Try `JSON.parse` on the trimmed whole buffer (the clean common case).
+ *   2. On failure, scan from the end for the last balanced top-level `{...}`
+ *      run (brace-depth counting, quote/escape aware) and parse that.
+ */
+function extractResultObject(raw) {
+  if (typeof raw !== 'string') {
+    return null;
+  }
+  const trimmed = raw.trim();
+  if (!trimmed) {
+    return null;
+  }
+  try {
+    return JSON.parse(trimmed);
+  } catch {
+    // fall through to the balanced-brace scan
+  }
+  const end = trimmed.lastIndexOf('}');
+  if (end === -1) {
+    return null;
+  }
+  // Walk backwards from the last '}', tracking brace depth while ignoring
+  // braces inside JSON strings, until depth returns to zero at the matching
+  // top-level '{'.
+  let depth = 0;
+  let inString = false;
+  for (let i = end; i >= 0; i--) {
+    const ch = trimmed[i];
+    if (inString) {
+      // A quote closes the string only if it isn't escaped. Count preceding
+      // backslashes: an even count means the quote is unescaped.
+      if (ch === '"') {
+        let backslashes = 0;
+        for (let j = i - 1; j >= 0 && trimmed[j] === '\\'; j--) {
+          backslashes++;
+        }
+        if (backslashes % 2 === 0) {
+          inString = false;
+        }
+      }
+      continue;
+    }
+    if (ch === '"') {
+      inString = true;
+    } else if (ch === '}') {
+      depth++;
+    } else if (ch === '{') {
+      depth--;
+      if (depth === 0) {
+        try {
+          return JSON.parse(trimmed.slice(i, end + 1));
+        } catch {
+          return null;
+        }
+      }
+    }
+  }
+  return null;
 }
 
 /**
