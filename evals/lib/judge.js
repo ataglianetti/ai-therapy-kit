@@ -14,6 +14,13 @@
 // no tokens. Real judged runs are OUT OF SCOPE for this module and are
 // human-gated: a caller must explicitly pass a `callModel` that hits the API.
 //
+// Stub-leak guard (F8): a caller that wires a REAL callModel MUST NOT label the
+// run STUB — run.js's buildJudgeConfig only marks `stub:true` when the default
+// stubCallModel is in use. The fail-closed coverage check in judge() is the
+// safety net: whether the call is stub or real, if the returned verdicts don't
+// cover exactly the requested gates the result fails closed (pass=false), so a
+// real model that drops a failing gate can't sneak a silent PASS through.
+//
 // Production model: the intended judge model is Anthropic **Sonnet**, supplied
 // as a CONFIG DEFAULT by whatever wires the real `callModel` — it is NOT
 // hardcoded here, and this module never spends money on its own.
@@ -165,13 +172,75 @@ export function parseVerdicts(raw) {
  * @param {string}   args.responseText  therapist reply to score
  * @param {string}   [args.rubricText]  optional category rubric markdown
  * @param {Function} [args.callModel]   (prompt)=>rawString; defaults to the
- *                                      offline stub (no paid call)
- * @returns {{verdicts: Array<{gate,pass,reason}>, pass: boolean}}
+ *                                      offline stub (no paid call). When a caller
+ *                                      wires a REAL model here, the run MUST NOT be
+ *                                      labeled STUB (see run.js buildJudgeConfig) —
+ *                                      and the coverage check below is the safety
+ *                                      net: a real model that drops, renames, or
+ *                                      duplicates a gate fails closed rather than
+ *                                      silently scoring PASS (F3/F8).
+ * @returns {{verdicts: Array<{gate,pass,reason}>, pass: boolean, coverageError?: string}}
  */
 export function judge({ caseObj, responseText, rubricText = '', callModel = stubCallModel }) {
   const prompt = buildJudgePrompt(caseObj, responseText, rubricText);
   const raw = callModel(prompt);
   const verdicts = parseVerdicts(raw);
-  const pass = verdicts.length > 0 && verdicts.every((v) => v.pass === true);
-  return { verdicts, pass };
+
+  // Coverage check (fail-closed): the returned verdicts must cover EXACTLY the
+  // requested gates — same set, same count, no missing/extra/renamed/duplicate
+  // gate. A holistic reply from a real model can quietly drop a failing gate and
+  // score PASS; this is the delegated-fact-check failure the module exists to
+  // prevent, so any mismatch forces pass=false regardless of the verdicts.
+  const requested = caseObj.expect.rubric_gates; // buildJudgePrompt already validated non-empty array
+  const coverageError = checkGateCoverage(requested, verdicts);
+
+  const allPass = verdicts.length > 0 && verdicts.every((v) => v.pass === true);
+  const pass = coverageError === null && allPass;
+
+  const result = { verdicts, pass };
+  if (coverageError !== null) {
+    result.coverageError = coverageError;
+    // Surface the discrepancy as a synthetic failing verdict so any consumer
+    // that only reads verdicts[] (not coverageError) still sees a failure.
+    result.verdicts = [
+      ...verdicts,
+      { gate: '__coverage__', pass: false, reason: coverageError },
+    ];
+  }
+  return result;
+}
+
+/**
+ * Compare the requested gate set against the gates the model actually returned.
+ * @param {string[]} requested  gate names asked for (non-empty)
+ * @param {Array<{gate:string}>} verdicts  parsed model verdicts
+ * @returns {string|null} human-readable discrepancy, or null when coverage is exact
+ */
+function checkGateCoverage(requested, verdicts) {
+  const returned = verdicts.map((v) => v.gate);
+
+  // Duplicate returned gate names are a coverage violation on their own.
+  const dupes = returned.filter((g, i) => returned.indexOf(g) !== i);
+  if (dupes.length > 0) {
+    return `duplicate gate(s) in verdicts: ${uniq(dupes).join(', ')}`;
+  }
+
+  const requestedSet = new Set(requested);
+  const returnedSet = new Set(returned);
+  const missing = requested.filter((g) => !returnedSet.has(g));
+  const extra = returned.filter((g) => !requestedSet.has(g));
+
+  if (missing.length > 0 || extra.length > 0) {
+    const parts = [];
+    if (missing.length > 0) parts.push(`missing gate(s): ${missing.join(', ')}`);
+    if (extra.length > 0) parts.push(`unexpected gate(s): ${extra.join(', ')}`);
+    return parts.join('; ');
+  }
+
+  // Sets match and no dupes => counts match too (n unique requested == n returned).
+  return null;
+}
+
+function uniq(arr) {
+  return [...new Set(arr)];
 }

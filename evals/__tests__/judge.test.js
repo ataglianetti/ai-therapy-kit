@@ -119,6 +119,109 @@ test('judge with a canned callModel: one gate fails -> pass false', () => {
   assert.equal(result.verdicts[2].reason, 'missed it');
 });
 
+// ---------------------------------------------------------------------------
+// judge() fail-closed coverage check (F3): returned gates must cover the
+// requested gate set exactly, or pass=false regardless of the verdicts.
+// ---------------------------------------------------------------------------
+
+test('judge fails closed when the model OMITS a requested gate', () => {
+  const caseObj = sampleCase();
+  // Return all gates except the last, every one pass:true.
+  const dropsAGate = () =>
+    JSON.stringify(
+      caseObj.expect.rubric_gates
+        .slice(0, -1)
+        .map((gate) => ({ gate, pass: true, reason: 'ok' }))
+    );
+  const result = judge({
+    caseObj,
+    responseText: 'reply',
+    callModel: dropsAGate,
+  });
+  assert.equal(result.pass, false);
+  assert.ok(result.coverageError, 'expected a coverageError string');
+  assert.match(result.coverageError, /missing gate/);
+  assert.match(result.coverageError, /honest_about_being_ai/);
+  // Synthetic failing verdict is appended so verdict-only consumers see it.
+  assert.ok(result.verdicts.some((v) => v.gate === '__coverage__' && v.pass === false));
+});
+
+test('judge fails closed when the model RENAMES a gate', () => {
+  const caseObj = sampleCase();
+  // Same count, all pass:true, but the 3rd gate is renamed.
+  const renamesAGate = () =>
+    JSON.stringify(
+      caseObj.expect.rubric_gates.map((gate, i) => ({
+        gate: i === 2 ? 'totally_different_gate' : gate,
+        pass: true,
+        reason: 'ok',
+      }))
+    );
+  const result = judge({
+    caseObj,
+    responseText: 'reply',
+    callModel: renamesAGate,
+  });
+  assert.equal(result.pass, false);
+  assert.ok(result.coverageError);
+  assert.match(result.coverageError, /missing gate/);
+  assert.match(result.coverageError, /unexpected gate/);
+  assert.match(result.coverageError, /totally_different_gate/);
+});
+
+test('judge fails closed on an EXTRA (unrequested) gate', () => {
+  const caseObj = sampleCase();
+  const addsAGate = () =>
+    JSON.stringify([
+      ...caseObj.expect.rubric_gates.map((gate) => ({ gate, pass: true, reason: 'ok' })),
+      { gate: 'bonus_gate', pass: true, reason: 'extra' },
+    ]);
+  const result = judge({ caseObj, responseText: 'reply', callModel: addsAGate });
+  assert.equal(result.pass, false);
+  assert.match(result.coverageError, /unexpected gate/);
+  assert.match(result.coverageError, /bonus_gate/);
+});
+
+test('judge fails closed on a DUPLICATE gate', () => {
+  const caseObj = { expect: { rubric_gates: ['g1', 'g2'] } };
+  const dupes = () =>
+    JSON.stringify([
+      { gate: 'g1', pass: true, reason: 'ok' },
+      { gate: 'g1', pass: true, reason: 'dup' },
+    ]);
+  const result = judge({ caseObj, responseText: 'reply', callModel: dupes });
+  assert.equal(result.pass, false);
+  assert.match(result.coverageError, /duplicate gate/);
+});
+
+test('judge passes when returned gates cover the request EXACTLY, all pass', () => {
+  const caseObj = sampleCase();
+  const exact = () =>
+    JSON.stringify(
+      caseObj.expect.rubric_gates.map((gate) => ({ gate, pass: true, reason: 'ok' }))
+    );
+  const result = judge({ caseObj, responseText: 'reply', callModel: exact });
+  assert.equal(result.pass, true);
+  assert.equal(result.coverageError, undefined);
+  assert.equal(result.verdicts.length, 5);
+});
+
+test('judge fails when coverage is exact but one gate fails (behavior preserved)', () => {
+  const caseObj = sampleCase();
+  const oneFails = () =>
+    JSON.stringify(
+      caseObj.expect.rubric_gates.map((gate, i) => ({
+        gate,
+        pass: i !== 1,
+        reason: i !== 1 ? 'ok' : 'nope',
+      }))
+    );
+  const result = judge({ caseObj, responseText: 'reply', callModel: oneFails });
+  assert.equal(result.pass, false);
+  assert.equal(result.coverageError, undefined); // coverage fine; failure is a real gate
+  assert.equal(result.verdicts.length, 5);
+});
+
 test('judge tolerates model output wrapped in a json fence', () => {
   const caseObj = { expect: { rubric_gates: ['g1', 'g2'] } };
   const fenced = () =>
