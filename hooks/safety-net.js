@@ -204,20 +204,24 @@ function tp(source) {
 
 // Shared overdose tail for the fp()/sl() composites below. The
 // prevention/awareness guard is general; the call guard is inverted to a
-// continuation blocklist (round-6 F54): "call(s)" reads as the
-// professional noun compound and stays silent ONLY when followed by a
-// closed class of workplace/time continuations ("call at work", "call an
-// hour into my shift", "calls a lot", "call center"). Any other
-// continuation — a digit, a person, a service, "for", "now", end of
-// message — reads as a help imperative or idiom inside crisis language
-// ("overdose call 911", "call mom", "call for help", "call poison
-// control") and fires. Recall-first: unknown continuations fire.
+// continuation blocklist (round-6 F54, narrowed round-8 F59): "call(s)"
+// reads as the professional noun compound and stays silent ONLY when
+// followed by an unambiguous compound continuation — a bare
+// preposition/adverb ("call at work", "call yesterday") or a compound
+// noun ("call center", "call logs"). The round-6 determiner+time-noun
+// branch was REMOVED per the PM asymmetric-close ruling (2026-07-05): it
+// swallowed help imperatives ("call the night nurse", "call a couple
+// friends" — F59, the F47 shape again), so its professional readings
+// ("call an hour into my shift", "call the other day") now FIRE as
+// accepted over-fires — Plan-2 eval candidates. Any other continuation —
+// a digit, a person, a service, "for", "now", end of message — reads as
+// a help imperative or idiom inside crisis language ("overdose call
+// 911", "call mom", "call for help") and fires. Recall-first: unknown
+// continuations fire.
 var OVERDOSE_TAIL =
   'overdos(?:e|ed|ing)\\b(?!\\s+(?:prevention|awareness)\\b)' +
   '(?!\\s+calls?\\s+(?:at|from|during|while|earlier|yesterday|today' +
-  '|tonight|last|once|twice|every|the\\s+other' +
-  '|(?:an?|the)\\s+(?:hour|minute|second|day|night|morning|evening' +
-  '|week|month|year|shift|while|lot|couple|few)' +
+  '|tonight|last|once|twice|every' +
   '|cent(?:er|re)s?|lines?|logs?|volume|training|shifts?)\\b)';
 
 // Tier 1: explicit suicidal-ideation / self-harm / method language.
@@ -279,29 +283,31 @@ var TIER1_PATTERNS = [
   // with..."), so first-person struggle idioms ("i'm struggling with
   // suicidal thoughts", "living with suicidal ideation is exhausting")
   // fire.
-  // Round-6 F53: possessive-of-other guards. Third-person possessive
-  // pronouns block across a short non-first-person modifier gap ("his
-  // intrusive suicidal thoughts"); genitive nouns block when immediately
-  // adjacent ("my brother's / my sons / the patients suicidal ideation" —
-  // both apostrophe and bare-s forms). Non-genitive s-enders keep firing,
-  // erring toward fire per the recorded ruling: -ss adjectives
-  // ("relentless"), copulas/adverbs (is/was/has/does/this/always/
-  // sometimes/perhaps), and plural time nouns ("some nights suicidal
-  // thoughts take over").
+  // Round-6 F53, narrowed round-8 F57/F58 (PM asymmetric-close ruling,
+  // 2026-07-05: no explicit first-person crisis phrase may be silent;
+  // every remaining boundary takes the over-fire side): the only
+  // possessive-of-other guard left is a third-person possessive pronoun
+  // (his/her/their/your) IMMEDIATELY before the keyword — "his suicidal
+  // thoughts scared his wife" stays silent. The round-6 bare-s/genitive
+  // noun lookbehind and the pronoun modifier gap were REMOVED: they
+  // silenced first-person forms ("i have serious suicidal thoughts", "my
+  // depression causes suicidal thoughts", "i can't tell her these
+  // suicidal thoughts are getting worse" — F57/F58 false-silences).
+  // Genitive reports ("my brother's / the patients suicidal ideation")
+  // and modified pronoun possessives ("his intrusive suicidal thoughts")
+  // now FIRE as accepted over-fires — Plan-2 eval candidates.
   // Round-6 F55: the with-guard gets the same bounded first-person clause
   // rescue the det branch uses ("i'm one of those people struggling with
   // suicidal thoughts" fires) plus an "as someone/people..."
   // self-apposition carve-out ("as someone dealing with suicidal thoughts
   // i need help" fires); subjectless professional/topical forms
   // ("patients with...", "so many people struggle with...") stay silent.
+  // Its over-fires on first-person professional framing ("i see patients
+  // with suicidal ideation every day at work") and descriptive "as
+  // people with..." apposition are accepted per the same ruling (F60).
   new RegExp(
     tpBlock(TP_CHAIN_MIN1) +
-      '(?<!\\b(?:his|her|their|your)\\s(?:(?!' +
-      FP_TOKEN +
-      "\\b|my\\b|me\\b|our\\b)[a-z']+\\s){0,2})" +
-      "(?<!\\b(?!(?:is|was|has|does|this|always|sometimes|perhaps|days" +
-      '|nights|mornings|evenings|weekends|weeks|months|years|times' +
-      "|hours)\\b)(?:[a-z]+'s|[a-z]*[a-rt-z]s)\\s)" +
+      '(?<!\\b(?:his|her|their|your)\\s)' +
       '(?<!(?:^|[.!?\\n;])(?:(?!\\b' +
       FP_TOKEN +
       '\\b)[^.!?\\n;]){0,80}?\\b(?<!\\bas\\s)' +

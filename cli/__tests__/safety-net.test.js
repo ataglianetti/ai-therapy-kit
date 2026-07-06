@@ -443,17 +443,46 @@ test('tier-1: apostrophe-less first-person clause rescue fires (round-5 F51)', (
   assertFires('im holding the pills to end it all');
 });
 
-test('negatives: genitive and modified possessive-of-other thoughts stay silent (round-6 F53)', () => {
-  assertSilent("my brother's suicidal thoughts scare me");
-  assertSilent('my sons suicidal ideation worries me so much');
-  assertSilent("my mom's suicidal thoughts scare me");
-  assertSilent("her coworker's suicidal thoughts came up at work");
-  assertSilent("my daughter's suicidal ideation is getting worse");
-  assertSilent('the patients suicidal ideation worsened overnight');
-  // Pronoun possessive reaches across a short modifier gap.
-  assertSilent('his intrusive suicidal thoughts scare his wife');
-  assertSilent('her constant suicidal ideation worries me');
-  assertSilent('their recurring suicidal thoughts need treatment');
+test('negatives: adjacent pronoun-possessive thoughts stay silent (round-6 F53 / round-8 F58)', () => {
+  // The only possessive-of-other guard left after the PM asymmetric-close
+  // ruling (2026-07-05): his/her/their/your immediately before the keyword.
+  assertSilent('his suicidal thoughts scared his wife');
+  assertSilent('her suicidal ideation');
+  assertSilent('their suicidal thoughts');
+});
+
+test('tier-1: first-person forms behind the removed round-6 guards fire (round-8 F57/F58)', () => {
+  // F57: the bare-s/genitive lookbehind silenced these (s-ending word
+  // right before the keyword). Guard removed — must fire.
+  assertFires('i have serious suicidal thoughts');
+  assertFires("i'm having serious suicidal thoughts");
+  assertFires('i keep having anxious suicidal thoughts');
+  assertFires('my depression causes suicidal thoughts');
+  assertFires('my anxiety triggers suicidal thoughts constantly');
+  assertFires('the panic attacks suicidal thoughts insomnia are all back');
+  assertFires('ever since starting these meds suicidal thoughts have gotten worse');
+  assertFires('as suicidal thoughts take over i cant function');
+  // F58: the pronoun-gap guard swallowed object-pronoun her/your inside
+  // first-person clauses. Reverted to immediate adjacency — must fire.
+  assertFires("i can't tell her these suicidal thoughts are getting worse");
+  assertFires('i never told her the suicidal thoughts got this bad');
+  assertFires('since i lost her the suicidal thoughts came back');
+  assertFires('i lied to her about the suicidal thoughts');
+});
+
+test('tier-1: genitive and modified-possessive over-fires accepted (round-8 F57/F58)', () => {
+  // accepted over-fire per PM asymmetric-close ruling 2026-07-05 — Plan-2
+  // eval candidate (each fixture below was a round-6 must-silent; the
+  // guards that silenced them also silenced first-person crisis phrases).
+  assertFires("my brother's suicidal thoughts scare me");
+  assertFires('my sons suicidal ideation worries me so much');
+  assertFires("my mom's suicidal thoughts scare me");
+  assertFires("her coworker's suicidal thoughts came up at work");
+  assertFires("my daughter's suicidal ideation is getting worse");
+  assertFires('the patients suicidal ideation worsened overnight');
+  assertFires('his intrusive suicidal thoughts scare his wife');
+  assertFires('her constant suicidal ideation worries me');
+  assertFires('their recurring suicidal thoughts need treatment');
 });
 
 test('tier-1: first-person possessive and elided-determiner forms keep firing (round-6 F53)', () => {
@@ -462,7 +491,8 @@ test('tier-1: first-person possessive and elided-determiner forms keep firing (r
   assertFires('my suicidal thoughts are back');
   assertFires('these suicidal thoughts wont stop');
   assertFires('our suicidal thoughts are back');
-  // Non-genitive s-enders err toward fire (boundary of the genitive guard).
+  // s-ending modifiers fire (the round-6 genitive lookbehind is gone —
+  // round-8 F57; these pins now guard against its reintroduction).
   assertFires('my relentless suicidal thoughts are back');
   assertFires('some nights suicidal thoughts take over');
   assertFires('this suicidal ideation is destroying me');
@@ -480,19 +510,38 @@ test('tier-1: overdose help imperatives with kinship, service, and bare tails fi
   assertFires('i overdosed call now');
 });
 
-test('negatives: professional overdose-call continuations stay silent (round-6 F54)', () => {
-  // Boundary of the continuation blocklist: workplace/time compounds only.
-  assertSilent('i took an overdose call an hour into my shift');
-  assertSilent('i took an overdose call the other day at work');
-  assertSilent('i take overdose calls a lot at work');
+test('negatives: professional overdose-call continuations stay silent (round-6 F54 / round-8 F59)', () => {
+  // Boundary of the narrowed blocklist: bare preposition/adverb and
+  // compound-noun continuations only.
+  assertSilent('i took an overdose call at work today');
   assertSilent('i handled an overdose call yesterday');
   assertSilent('the overdose call center is hiring');
+});
+
+test('tier-1: determiner-led overdose-call continuations fire (round-8 F59)', () => {
+  // The round-6 determiner+time-noun blocklist branch swallowed help
+  // imperatives (the F47 shape again). Branch removed — must fire.
+  assertFires('i overdosed call the night nurse');
+  assertFires('im overdosing call the morning nurse');
+  assertFires('gonna overdose call the other hotline');
+  assertFires("i'm going to overdose call the other number if no one answers");
+  assertFires('i overdosed call a couple friends');
+  // accepted over-fire per PM asymmetric-close ruling 2026-07-05 — Plan-2
+  // eval candidate (round-6 must-silents that shared the removed branch).
+  assertFires('i took an overdose call an hour into my shift');
+  assertFires('i took an overdose call the other day at work');
+  assertFires('i take overdose calls a lot at work');
 });
 
 test('tier-1: first-person clauses behind professional with-heads fire (round-6 F55)', () => {
   assertFires("i'm one of those people struggling with suicidal thoughts");
   assertFires('as someone dealing with suicidal thoughts i need help');
   assertFires('im one of those people living with suicidal ideation');
+  // accepted over-fire per PM asymmetric-close ruling 2026-07-05 — Plan-2
+  // eval candidate (F60: clause rescue fires professional first-person
+  // framing; as-carve-out fires descriptive "as people with" apposition).
+  assertFires('i see patients with suicidal ideation every day at work');
+  assertFires('as people with suicidal ideation know recovery is not linear');
 });
 
 test('negatives: subjectless professional/topical with-forms stay silent (round-6 F55)', () => {
