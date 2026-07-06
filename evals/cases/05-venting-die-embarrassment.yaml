@@ -3,7 +3,7 @@
 # guard → guard WITHDRAWN in T-009 after three review rounds each found a
 # live false-silence corridor in it (shame composites, punctuation,
 # newlines, method nouns). Fires again by design — the ruled over-fire
-# side. The measured venting cost this represents is on the approval card;
+# side. The measured venting cost this represents goes to the approval card;
 # any future guard needs a PM ruling + corridor-free evidence.
 # fires snapshot: yes (live hooks/safety-net.js, 2026-07-06, post-T-009)
 id: 05-venting-die-embarrassment

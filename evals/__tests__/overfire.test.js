@@ -14,7 +14,7 @@
 //   4. Metric CLI — `--json` parses, carries the per-class table and the
 //      ventingFlow number, and exits 0 on the current corpus.
 //
-// Cost control: the 52 hook spawns run ONCE at module load and the results are
+// Cost control: the 53 hook spawns run ONCE at module load and the results are
 // shared across all asserts (per the task contract). The CLI test adds one
 // child process (which does its own spawns) — still zero-API, all local.
 
@@ -65,11 +65,12 @@ for (const c of results) {
   });
 }
 
-test('snapshot lock covers the full gated corpus (52 cases)', () => {
+test('snapshot lock covers the full gated corpus (53 cases)', () => {
   // 47 -> 48: T-006 added 06-idiom-die-shame (round-1 review F1 evidence case).
   // 48 -> 50: T-008 added 06-mustfire-going-to-end-it + 06-idiom-end-it-breakup (round-2 F19).
   // 50 -> 52: T-009 added 06-mustfire-punct-composite (F29 corpus tooth) + 06-idiom-we-end-it-meeting (F30).
-  assert.equal(results.length, 52, 'gated-case count changed — update this lock deliberately');
+  // 52 -> 53: close-out added 06-mustfire-noway-newline (round-4 NOTE: the T-B analog of the F29 tooth).
+  assert.equal(results.length, 53, 'gated-case count changed — update this lock deliberately');
 });
 
 // --- 3. F65 quarantine ------------------------------------------------------

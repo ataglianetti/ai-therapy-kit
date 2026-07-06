@@ -409,8 +409,8 @@ var TIER2_PATTERNS = [
   // same class as round-2 F17's comma). Corridor-free by construction:
   // the only silenced shape is a message that literally ends at the
   // transactional noun. Recall-first: bare "no way out", "of this
-  // life/pain", "of the contract of my life", and ANY continuation —
-  // punctuation, newline, or text — after the noun fires.
+  // life/pain", "of the contract of my life", and any continuation beyond
+  // a trailing punctuation run — a newline or any text — fires.
   /\bno\s+way\s+out\b(?!\s+of\s+(?:this|the|that|my|our|a|an)\s+(?:contract|lease)\b *[.!?,;:…]*\s*$)/,
   /\bbetter\s+off\s+if\s+i\s+(?:was|were)\s+gone\b/
 ];
