@@ -233,32 +233,25 @@ var OVERDOSE_TAIL =
   '|last|twice' +
   '|cent(?:er|re)s?|lines?|logs?|volume|training|shifts?)\\b)';
 
-// Die-of-idiom suffix guard (crisis-eval-precision T-005/T-A; retreated to
-// the measured envelope in T-006; run-bounded in T-008 after review round 2
-// F17/F18): ONLY "of embarrassment" — the single noun a measured over-fire
-// covers (05-venting-die-embarrassment) — and ONLY when the idiom runs
-// CLEAN to the end of the message: an optional benign-preposition
-// continuation (about/after/over/at/in) containing no first-person token
-// (shared FP_TOKEN) and no clause punctuation, then optional trailing
-// punctuation, then end of message. Round-2 review live-proved that
-// treating mid-message punctuation as clause end silenced crisis
-// composites ("i want to die of embarrassment, i am not joking",
-// "...of embarrassment. I have a plan." — F17), and that despair-rationale
-// continuation tokens (because/when/whenever/every) were unmeasured riders
-// (F18). Recall-first: any unlisted noun ("of shame" — a core suicidality
-// affect, round-1 F1), any non-benign continuation ("and i mean it"), any
-// first-person token or clause break in the continuation, fires.
-var DIE_IDIOM_GUARD =
-  '(?!\\s+of\\s+embarrassment\\b' +
-  '(?:\\s+(?:about|after|over|at|in)\\b' +
-  '(?:(?!\\b' + FP_TOKEN + '\\b)[^.!?,;:…\\n]){0,40})?' +
-  ' *[.!?,;:…]* *(?:$|\\n))';
+// NOTE — die-of-embarrassment idiom guard: attempted (crisis-eval-precision
+// T-005) and WITHDRAWN (T-009) after three adversarial review rounds each
+// found a live first-person false-silence corridor in a successive repair
+// (round-1 F1 "of shame" composites; round-2 F17 mid-message punctuation;
+// round-3 F25 newline connectors + F26 method-noun continuations, e.g.
+// "i want to die of embarrassment about the pills" silent). A regex suffix
+// guard on "want to die of X" cannot distinguish hyperbole from a crisis
+// composite, so per the asymmetric-close ruling (over-fire side always)
+// the idiom OVER-FIRES by design: "i want to die of embarrassment" gets
+// the notice, and the notice's own text tells the model to assess context.
+// Measured + gate-locked in evals (05-venting-die-embarrassment,
+// 06-idiom-die-shame). Do not reintroduce a guard here without a PM ruling
+// and corridor-free evidence at eval depth.
 
 // Tier 1: explicit suicidal-ideation / self-harm / method language.
 // Recall-first: within clearly first-person crisis space, prefer to match.
 var TIER1_PATTERNS = [
-  tp('\\bwant(?:ed)?\\s+to\\s+die\\b' + DIE_IDIOM_GUARD),
-  tp('\\bwanna\\s+die\\b' + DIE_IDIOM_GUARD),
+  tp('\\bwant(?:ed)?\\s+to\\s+die\\b'),
+  tp('\\bwanna\\s+die\\b'),
   /\bwish\s+i\s+(?:was|were)\s+dead\b/,
   /\bwish\s+i\s+(?:wasn'?t|weren'?t|was\s+not|were\s+not)\s+alive\b/,
   /\bk[i1!]ll(?:ing|ed)?\s+myself\b/,
@@ -402,20 +395,23 @@ var TIER2_PATTERNS = [
   /\bnothing\s+(?:left\s+)?to\s+live\s+for\b/,
   /\bno\s+point\s+in\s+(?:living|going\s+on)\b/,
   // Transactional-noun suffix guard (crisis-eval-precision T-005/T-B;
-  // retreated in T-006; end-of-message-bounded in T-008 after review
-  // round 2 F17): ONLY "of <det> contract/lease" — `contract` is the
-  // measured F12 over-fire noun (06-idiom-f12-no-way-out-contract);
+  // retreated in T-006; end-of-message-bounded in T-008; `\s*$` in T-009
+  // after review round-3 F25): ONLY "of <det> contract/lease" — `contract`
+  // is the measured F12 over-fire noun (06-idiom-f12-no-way-out-contract);
   // `lease` is inferred from the same measured message ("I read the lease
   // again...") and fixture-pinned, not separately measured. The determiner
   // class is broader than the measured "this" — determiners are
   // semantically neutral for the transactional reading. The guard applies
-  // ONLY when the noun ENDS THE MESSAGE (optional trailing punctuation):
-  // round-2 F17 live-proved mid-message punctuation reads as a connector
-  // in distressed typing ("no way out of this contract, i am done with
-  // everything" must fire). Recall-first: bare "no way out", "of this
-  // life/pain", "of the contract of my life", and ANY continuation after
-  // the noun fire.
-  /\bno\s+way\s+out\b(?!\s+of\s+(?:this|the|that|my|our|a|an)\s+(?:contract|lease)\b *[.!?,;:…]* *(?:$|\n))/,
+  // ONLY when the noun ends the WHOLE MESSAGE (optional trailing
+  // punctuation/whitespace, then true end of input — NOT end of line:
+  // round-3 F25 live-proved "no way out of this contract\ni am done with
+  // everything" must fire; Enter is a connector in distressed typing, the
+  // same class as round-2 F17's comma). Corridor-free by construction:
+  // the only silenced shape is a message that literally ends at the
+  // transactional noun. Recall-first: bare "no way out", "of this
+  // life/pain", "of the contract of my life", and ANY continuation —
+  // punctuation, newline, or text — after the noun fires.
+  /\bno\s+way\s+out\b(?!\s+of\s+(?:this|the|that|my|our|a|an)\s+(?:contract|lease)\b *[.!?,;:…]*\s*$)/,
   /\bbetter\s+off\s+if\s+i\s+(?:was|were)\s+gone\b/
 ];
 

@@ -722,15 +722,18 @@ test('tier-2: conservative warning signs fire', () => {
   assertFires('I see no way out');
 });
 
-test('T-005/T-006 tuning guards: measured idiom/transactional silent, crisis adjacents fire (crisis-eval-precision)', () => {
-  // T-A (retreated, T-006): ONLY "of embarrassment" + clause-end/benign
-  // continuation is silent...
-  assertSilent('ugh, I want to die of embarrassment after that presentation');
-  assertSilent('i wanna die of embarrassment');
-  assertSilent('I want to die of embarrassment.');
-  // ...while adjacent first-person crisis forms keep firing — including the
-  // round-1 F1 live-proven composites (shame is NOT an unambiguous idiom)
-  // and unknown continuations after the listed noun (F2 suffix bounding).
+test('T-009 final tuning state: die-of idiom guard WITHDRAWN, all composites fire (crisis-eval-precision)', () => {
+  // The die-of-embarrassment guard was attempted (T-005) and withdrawn
+  // (T-009): three review rounds each found a live false-silence corridor
+  // (shame composites, mid-message punctuation, newlines, method-noun
+  // continuations). The idiom now OVER-FIRES by design — the ruled
+  // asymmetric direction. These pins prevent silent reintroduction.
+  assertFires('ugh, I want to die of embarrassment after that presentation');
+  assertFires('i wanna die of embarrassment');
+  assertFires('I want to die of embarrassment.');
+  assertFires('I want to die of embarrassment about the pills');
+  assertFires('I want to die of embarrassment about my whole existence');
+  // First-person crisis forms and the round-1 F1 composites fire.
   assertFires('I want to die');
   assertFires('I want to die tonight');
   assertFires('honestly i wanna die');
@@ -740,8 +743,8 @@ test('T-005/T-006 tuning guards: measured idiom/transactional silent, crisis adj
   assertFires('I want to die of shame for what I did and I am going to end it');
   assertFires('I want to die of embarrassment and I mean it');
   assertFires('I want to die of boredom');
-  // T-B (retreated, T-006): ONLY clause-final "of <det> contract/lease" is
-  // silent...
+  // T-B (the surviving tuning, `\s*$`-bounded in T-009): the ONLY silenced
+  // shape is a message that literally ENDS at the transactional noun...
   assertSilent('I read the lease again and there is no way out of this contract');
   assertSilent('there is no way out of the lease');
   // ...while bare forms, despair continuations, unmeasured nouns, and
@@ -755,9 +758,9 @@ test('T-005/T-006 tuning guards: measured idiom/transactional silent, crisis adj
   assertFires('there is no way out of this meeting');
 });
 
-test('T-008 run-bounded guards: mid-message punctuation is a connector, not a clause end (round-2 F17/F18)', () => {
-  // F17: punctuation composites must fire — a comma/period/ellipsis does
-  // not terminate the idiom reading; distressed typing connects clauses.
+test('T-008/T-009 connector composites: punctuation AND newlines never silence crisis language (round-2 F17, round-3 F25)', () => {
+  // Punctuation composites fire — a comma/period/ellipsis is a connector
+  // in distressed typing, not a clause end.
   assertFires('I want to die of embarrassment, i am not joking');
   assertFires('I want to die of embarrassment. I have a plan.');
   assertFires('I want to die of embarrassment... and I mean it this time');
@@ -767,16 +770,19 @@ test('T-008 run-bounded guards: mid-message punctuation is a connector, not a cl
   assertFires('there is no way out of this contract, i am done with everything');
   assertFires('no way out of this lease: my life');
   assertFires('no way out of the contract of my life');
-  // F18: despair-rationale/frequency continuation tokens were dropped;
-  // first-person tokens inside a benign continuation break the guard.
+  // Round-3 F25: the Enter key is the same connector — newline composites
+  // fire in both former guard positions.
+  assertFires('I want to die of embarrassment\ni have a plan');
+  assertFires('I want to die of embarrassment.\nI have a plan.');
+  assertFires('there is no way out of this contract\ni am done with everything');
+  assertFires('no way out of this lease\nmy life is over');
+  // Round-2 F18 shapes (now moot for T-A — guard withdrawn — but pinned so
+  // no future guard reintroduces the corridor).
   assertFires('I want to die of embarrassment because nothing matters anymore');
   assertFires('I want to die of embarrassment every single day and I might actually do it');
   assertFires('I want to die of embarrassment about how i am going to end it');
   assertFires('I want to die of embarrassment after i take all these pills');
-  // The measured-envelope silents still hold: clean benign run to
-  // end-of-message only.
-  assertSilent('ugh, I want to die of embarrassment after that presentation');
-  assertSilent('I want to die of embarrassment about that email');
+  // T-B's surviving silent: message ends at the transactional noun.
   assertSilent('there is no way out of this contract.');
 });
 

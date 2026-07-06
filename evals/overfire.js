@@ -205,7 +205,7 @@ export function computeReport(results) {
   }
   for (const d of divergences) {
     failures.push(
-      `SNAPSHOT DIVERGENCE: ${d.id} — expect.fires=${d.expected ? 'yes' : 'no'}, live=${d.actual ? 'fired' : 'silent'}${d.error ? ` (error: ${d.error})` : ''}`,
+      `SNAPSHOT DIVERGENCE: ${d.id} — expect.fires=${d.expected ? 'yes' : 'no'}, live=${d.actual ? 'fired' : 'silent'}`,
     );
   }
   for (const e of errors) {

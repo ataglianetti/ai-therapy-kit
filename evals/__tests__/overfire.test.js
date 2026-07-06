@@ -14,7 +14,7 @@
 //   4. Metric CLI — `--json` parses, carries the per-class table and the
 //      ventingFlow number, and exits 0 on the current corpus.
 //
-// Cost control: the 50 hook spawns run ONCE at module load and the results are
+// Cost control: the 52 hook spawns run ONCE at module load and the results are
 // shared across all asserts (per the task contract). The CLI test adds one
 // child process (which does its own spawns) — still zero-API, all local.
 
@@ -65,10 +65,11 @@ for (const c of results) {
   });
 }
 
-test('snapshot lock covers the full gated corpus (50 cases)', () => {
+test('snapshot lock covers the full gated corpus (52 cases)', () => {
   // 47 -> 48: T-006 added 06-idiom-die-shame (round-1 review F1 evidence case).
   // 48 -> 50: T-008 added 06-mustfire-going-to-end-it + 06-idiom-end-it-breakup (round-2 F19).
-  assert.equal(results.length, 50, 'gated-case count changed — update this lock deliberately');
+  // 50 -> 52: T-009 added 06-mustfire-punct-composite (F29 corpus tooth) + 06-idiom-we-end-it-meeting (F30).
+  assert.equal(results.length, 52, 'gated-case count changed — update this lock deliberately');
 });
 
 // --- 3. F65 quarantine ------------------------------------------------------
@@ -206,12 +207,15 @@ test('venting-flow arithmetic: 2 venting cases, 1 fired -> rate 0.5, display "1/
   assert.equal(rep.exitCode, 0, 'both cases match their snapshots — no failure');
 });
 
-// Live-corpus pin: the venting class is 12 cases, 4 of which fire today.
+// Live-corpus pin: the venting class is 12 cases, 5 of which fire today.
+// (4 -> 5 in T-009: the die-of-embarrassment idiom guard was WITHDRAWN after
+// three review rounds each found a false-silence corridor in it, so that
+// venting case fires again — the ruled over-fire direction.)
 // Update these numbers DELIBERATELY when the corpus changes (new venting case
 // or a PM-ruled matcher change) — never to make a red run green.
-test('venting-flow live pin: 4/12 fired on the current corpus', () => {
+test('venting-flow live pin: 5/12 fired on the current corpus', () => {
   assert.equal(report.ventingFlow.total, 12, 'venting case count changed — update this pin deliberately');
-  assert.equal(report.ventingFlow.fired, 4, 'venting fire count changed — update this pin deliberately');
+  assert.equal(report.ventingFlow.fired, 5, 'venting fire count changed — update this pin deliberately');
 });
 
 // --- Fire-check error visibility (F7) ---------------------------------------
@@ -237,6 +241,31 @@ test('gate hard-fails on a fire-check error even when snapshot agrees (stubbed)'
   assert.ok(
     rep.failures.some((f) => f.includes('FIRE-CHECK ERROR') && f.includes('stub-errored-case')),
     'failure line must name the errored case',
+  );
+});
+
+// Round-3 F28/F-3B: the F22 de-dup itself must be guarded — an errored case
+// whose defaulted fired=false DISAGREES with its snapshot is reported ONLY as
+// a fire-check error, never additionally as a snapshot divergence (one cause,
+// one failure line). This is the mutation round-3's reviewer proved survived.
+test('errored case with a disagreeing snapshot is not double-reported as a divergence (stubbed)', () => {
+  const stub = [
+    {
+      id: 'stub-errored-disagreeing',
+      class: 'mustfire',
+      intent: 'must-fire',
+      snapshot: true,
+      message: 'stub',
+      live: { fired: false, notice: null, error: 'timeout' },
+    },
+  ];
+  const rep = computeReport(stub);
+  assert.notEqual(rep.exitCode, 0, 'gate must still fail');
+  assert.equal(rep.divergences.length, 0, 'errored cases are excluded from divergences (F22 de-dup)');
+  assert.equal(rep.errors.length, 1);
+  assert.ok(
+    rep.failures.some((f) => f.includes('FIRE-CHECK ERROR') && f.includes('stub-errored-disagreeing')),
+    'the error line carries the failure',
   );
 });
 
