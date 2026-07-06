@@ -1,0 +1,162 @@
+{
+  "kit_version": "2.8.0",
+  "installed": "2026-07-06",
+  "files": {
+    ".therapy/safety-protocol.md": {
+      "version": "1.1.0",
+      "hash": "sha256-b8a664f247a277b9dc482568b24ca908120e6391ae6a04baa87b4e91fb58e3eb",
+      "source": "safety-protocol.md"
+    },
+    ".therapy/commands.md": {
+      "version": "1.4.0",
+      "hash": "sha256-6dbdadd2d68588454f8ecf316250b6befb8b53a7e8cd6fc20508316308d7b4b4",
+      "source": "commands.md"
+    },
+    ".therapy/hooks/safety-net.js": {
+      "version": "1.0.0",
+      "hash": "sha256-fcf221f506372df9546c792fc2fb53c8557a62dc815764b63416b02a6b008b36",
+      "source": "hooks/safety-net.js"
+    },
+    ".therapy/library/personas/coach.md": {
+      "version": "1.2.0",
+      "hash": "sha256-b6cfd6f27390b9c2e3815eb2341f634399403e61953d440744eaf3deddca6c91",
+      "source": "personas/coach.md"
+    },
+    ".therapy/library/personas/contemplative.md": {
+      "version": "1.2.0",
+      "hash": "sha256-93a40d695392f26326920f4d4c8b02f65cfcc82160b78f3f2c04f5af3a7b8e54",
+      "source": "personas/contemplative.md"
+    },
+    ".therapy/library/personas/creative.md": {
+      "version": "1.2.0",
+      "hash": "sha256-79cb6895969c2e0fdc53efe1db71bccba6818d2e6f8e501b604df74e4b490240",
+      "source": "personas/creative.md"
+    },
+    ".therapy/library/personas/direct-challenging.md": {
+      "version": "1.2.0",
+      "hash": "sha256-f25413eea770279e6acd651bd96ad976dd5816305ae1577723c3ddc54d42fa37",
+      "source": "personas/direct-challenging.md"
+    },
+    ".therapy/library/personas/grounded-real.md": {
+      "version": "1.2.0",
+      "hash": "sha256-c6aca4bc39661dcc227f4cebbe946396b4a9a22ea42a64048b6d883ffb80e152",
+      "source": "personas/grounded-real.md"
+    },
+    ".therapy/library/personas/philosophical.md": {
+      "version": "1.2.0",
+      "hash": "sha256-fad1fc79d7d801e3cca6e7fcbdcd208eb978e8d64f2da4fe542b0f98802e9a65",
+      "source": "personas/philosophical.md"
+    },
+    ".therapy/library/personas/warm-4o.md": {
+      "version": "1.2.0",
+      "hash": "sha256-22c83a4806e9208b4e65cf7645a24b8410ae419b01e5d38db4716c42b302cc58",
+      "source": "personas/warm-4o.md"
+    },
+    ".therapy/library/personas/warm-supportive.md": {
+      "version": "1.2.0",
+      "hash": "sha256-28413707ed5080566c5268a273c22040581492c3a2c7290697abc183bb6c3de7",
+      "source": "personas/warm-supportive.md"
+    },
+    ".therapy/library/modalities/act.md": {
+      "version": "1.1.0",
+      "hash": "sha256-4606a0f5f7e93e8cf57423d935742e098df773b91265cfa894d1b86311642836",
+      "source": "modalities/act.md"
+    },
+    ".therapy/library/modalities/cbt.md": {
+      "version": "1.1.0",
+      "hash": "sha256-078fc2003dd587ee55af2ec7b4108f2904d5177e0156e665e63122a1ef0e983c",
+      "source": "modalities/cbt.md"
+    },
+    ".therapy/library/modalities/cft.md": {
+      "version": "1.1.0",
+      "hash": "sha256-a9165710390d7401b5445f52e2b4f618adf28ff6b00755132fa35a29bab619e4",
+      "source": "modalities/cft.md"
+    },
+    ".therapy/library/modalities/dbt-skills.md": {
+      "version": "1.1.0",
+      "hash": "sha256-bed351378d98385e57e1230f0ef36d97113d09a236ee712c21eff28e3b4bebff",
+      "source": "modalities/dbt-skills.md"
+    },
+    ".therapy/library/modalities/ideal-parent-figure.md": {
+      "version": "1.1.0",
+      "hash": "sha256-f09888112f5859f5d22ffabe730cf5bc926d6cda9f66252d90c311c83e533a69",
+      "source": "modalities/ideal-parent-figure.md"
+    },
+    ".therapy/library/modalities/ifs.md": {
+      "version": "1.1.0",
+      "hash": "sha256-09ac8fe2ef0b8eedeb6d69c9d125a9c57dc30fafc0e814ae2c9d4459f42dc81b",
+      "source": "modalities/ifs.md"
+    },
+    ".therapy/library/modalities/lifespan-integration.md": {
+      "version": "1.1.0",
+      "hash": "sha256-fe16f8251c8175a1d8d9a3363c9795928186ea50793f1577e4bc81498dbedd81",
+      "source": "modalities/lifespan-integration.md"
+    },
+    ".therapy/library/modalities/motivational-interviewing.md": {
+      "version": "1.1.0",
+      "hash": "sha256-5c88e5ec08f3e63cb82a8c3b1be48e4f8e723ceaa3424d313294049218590be4",
+      "source": "modalities/motivational-interviewing.md"
+    },
+    ".therapy/library/modalities/narrative.md": {
+      "version": "1.1.0",
+      "hash": "sha256-ec298e50a8d3258718cba11f61eb431ecb22a9a78600e85ac23a0229fdbe21b6",
+      "source": "modalities/narrative.md"
+    },
+    ".therapy/library/modalities/polyvagal.md": {
+      "version": "1.1.0",
+      "hash": "sha256-69ddc0671d04ecbcae51acd62c210290b8823a0a99d4ecbd7555fb2a49146948",
+      "source": "modalities/polyvagal.md"
+    },
+    ".therapy/library/modalities/psychodynamic.md": {
+      "version": "1.1.0",
+      "hash": "sha256-a9708d273f8fe50e1405148e5b839304b72e5b7afd7bd7a110cda7ebac02bb8e",
+      "source": "modalities/psychodynamic.md"
+    },
+    ".therapy/library/modalities/sfbt.md": {
+      "version": "1.1.0",
+      "hash": "sha256-06acb0983236867aa4d9c94974ba45d0bee3013382fa78d433bd17ef5beff282",
+      "source": "modalities/sfbt.md"
+    },
+    ".therapy/library/modalities/somatic-experiencing.md": {
+      "version": "1.1.0",
+      "hash": "sha256-f9036f63703c49ef2d5321a7b0452a4f9380ff47b2017fded70e6ba754909785",
+      "source": "modalities/somatic-experiencing.md"
+    },
+    ".therapy/library/structures/freeform.md": {
+      "version": "1.0.0",
+      "hash": "sha256-2e4d42b6e1f91a091c9663e706d06e5d7e62ae536567ca956aaa47083ea6a71c",
+      "source": "structures/freeform.md"
+    },
+    ".therapy/library/structures/moderate.md": {
+      "version": "1.0.0",
+      "hash": "sha256-3bf2592c20e7158361ff83a72d2dfe449894069d9f8b60c3350be277d60551ac",
+      "source": "structures/moderate.md"
+    },
+    ".therapy/library/structures/structured.md": {
+      "version": "1.0.0",
+      "hash": "sha256-9a334c71a2d0ae63fe012238ab07277943688f533019dec9bb3ea026d0f46553",
+      "source": "structures/structured.md"
+    },
+    ".therapy/persona.md": {
+      "version": null,
+      "hash": "sha256-22c83a4806e9208b4e65cf7645a24b8410ae419b01e5d38db4716c42b302cc58",
+      "source": "personas/warm-4o.md"
+    },
+    ".therapy/session-structure.md": {
+      "version": null,
+      "hash": "sha256-3bf2592c20e7158361ff83a72d2dfe449894069d9f8b60c3350be277d60551ac",
+      "source": "structures/moderate.md"
+    },
+    ".therapy/modalities/cbt.md": {
+      "version": null,
+      "hash": "sha256-078fc2003dd587ee55af2ec7b4108f2904d5177e0156e665e63122a1ef0e983c",
+      "source": "modalities/cbt.md"
+    },
+    ".therapy/modalities/ifs.md": {
+      "version": null,
+      "hash": "sha256-09ac8fe2ef0b8eedeb6d69c9d125a9c57dc30fafc0e814ae2c9d4459f42dc81b",
+      "source": "modalities/ifs.md"
+    }
+  },
+  "source_url": "https://github.com/ataglianetti/inner-dialogue"
+}
