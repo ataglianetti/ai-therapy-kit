@@ -722,6 +722,28 @@ test('tier-2: conservative warning signs fire', () => {
   assertFires('I see no way out');
 });
 
+test('T-005 tuning guards: idiom/transactional silent, crisis adjacents fire (crisis-eval-precision)', () => {
+  // T-A: die-of-idiom suffix guard. The enumerated idiom nouns are silent...
+  assertSilent('ugh, I want to die of embarrassment after that presentation');
+  assertSilent('i wanna die of embarrassment');
+  assertSilent('I want to die of shame');
+  // ...while adjacent first-person crisis forms keep firing (recall-first:
+  // unknown continuations fire, including grief).
+  assertFires('I want to die');
+  assertFires('I want to die tonight');
+  assertFires('honestly i wanna die');
+  assertFires('I want to die of grief');
+  // T-B: transactional-noun suffix guard on "no way out". Transactional
+  // continuations are silent...
+  assertSilent('I read the lease again and there is no way out of this contract');
+  assertSilent('there is no way out of the lease');
+  // ...while bare and despair-adjacent forms keep firing.
+  assertFires('there is no way out');
+  assertFires('I feel trapped, no way out.');
+  assertFires('there is no way out of this life');
+  assertFires('no way out of this pain');
+});
+
 test('tier-2: broadened phrasings fire (round-1 F3)', () => {
   assertFires('I cannot go on');
   assertFires("I can't go on");

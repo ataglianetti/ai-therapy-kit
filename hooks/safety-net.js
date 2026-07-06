@@ -233,11 +233,21 @@ var OVERDOSE_TAIL =
   '|last|twice' +
   '|cent(?:er|re)s?|lines?|logs?|volume|training|shifts?)\\b)';
 
+// Shared die-of-idiom suffix guard (crisis-eval-precision T-005/T-A, PM
+// tuning authorization 2026-07-06): "want to die of embarrassment/shame/
+// laughter/boredom/cringe" is the hyperbole idiom, not ideation — measured
+// as a venting over-fire by evals/overfire.js. Enumerated-noun blocklist,
+// recall-first: any other continuation ("want to die tonight", "want to
+// die of grief") keeps firing. Mirrors the awareness/prevention-suffix
+// convention on self-harm/overdose.
+var DIE_IDIOM_GUARD =
+  '(?!\\s+of\\s+(?:embarrassment|shame|laughter|boredom|cringe)\\b)';
+
 // Tier 1: explicit suicidal-ideation / self-harm / method language.
 // Recall-first: within clearly first-person crisis space, prefer to match.
 var TIER1_PATTERNS = [
-  tp('\\bwant(?:ed)?\\s+to\\s+die\\b'),
-  tp('\\bwanna\\s+die\\b'),
+  tp('\\bwant(?:ed)?\\s+to\\s+die\\b' + DIE_IDIOM_GUARD),
+  tp('\\bwanna\\s+die\\b' + DIE_IDIOM_GUARD),
   /\bwish\s+i\s+(?:was|were)\s+dead\b/,
   /\bwish\s+i\s+(?:wasn'?t|weren'?t|was\s+not|were\s+not)\s+alive\b/,
   /\bk[i1!]ll(?:ing|ed)?\s+myself\b/,
@@ -371,7 +381,14 @@ var TIER2_PATTERNS = [
   /\bno\s+reason\s+to\s+(?:live|go\s+on|keep\s+going)\b/,
   /\bnothing\s+(?:left\s+)?to\s+live\s+for\b/,
   /\bno\s+point\s+in\s+(?:living|going\s+on)\b/,
-  /\bno\s+way\s+out\b/,
+  // Transactional-noun suffix guard (crisis-eval-precision T-005/T-B, PM
+  // tuning authorization 2026-07-06): "no way out of this contract/lease/
+  // deal/meeting/agreement/subscription/traffic" is transactional, not
+  // despair — measured as an F12 over-fire by evals/overfire.js.
+  // Recall-first: the noun list is closed and unambiguous; "no way out of
+  // this life/pain/marriage", bare "no way out", and every unknown
+  // continuation keep firing.
+  /\bno\s+way\s+out\b(?!\s+of\s+(?:this|the|that|my|our|a|an)\s+(?:contract|lease|deal|meeting|agreement|subscription|traffic)\b)/,
   /\bbetter\s+off\s+if\s+i\s+(?:was|were)\s+gone\b/
 ];
 
