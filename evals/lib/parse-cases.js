@@ -21,7 +21,8 @@ const RESERVED_CATEGORIES = [3, 4, 6];
 const VALID_CATEGORIES = [...ACTIVE_CATEGORIES, ...RESERVED_CATEGORIES];
 
 const TOP_LEVEL_KEYS = ['id', 'category', 'messages', 'expect'];
-const EXPECT_KEYS = ['must_include', 'must_not_include', 'rubric_gates'];
+// `fires` is the only scalar under `expect`; the other three are block lists.
+const EXPECT_KEYS = ['must_include', 'must_not_include', 'rubric_gates', 'fires'];
 
 // Detect the indentation of a raw line (spaces only; tabs are rejected).
 function indentOf(rawLine) {
@@ -133,7 +134,7 @@ function assertStringList(value, field, lineNo) {
 /**
  * Parse case-file text into a case object.
  * @param {string} text
- * @returns {{id: string, category: number, messages: string[], expect: {must_include: string[], must_not_include: string[], rubric_gates: string[]}}}
+ * @returns {{id: string, category: number, messages: string[], expect: {must_include: string[], must_not_include: string[], rubric_gates: string[], fires?: boolean}}}
  */
 export function parseCase(text) {
   if (typeof text !== 'string') {
@@ -273,6 +274,21 @@ function parseExpectBlock(tokens, start, header) {
       );
     }
     seen.add(key);
+    if (key === 'fires') {
+      // `fires` is an optional scalar (yes/no/true/false) → JS boolean.
+      const scalar = parseScalar(rest, tok.lineNo).toLowerCase();
+      if (scalar === 'yes' || scalar === 'true') {
+        expect.fires = true;
+      } else if (scalar === 'no' || scalar === 'false') {
+        expect.fires = false;
+      } else {
+        throw new Error(
+          `Line ${tok.lineNo}: "fires" must be yes/no (or true/false), got "${scalar}"`,
+        );
+      }
+      i++;
+      continue;
+    }
     if (rest.trim() !== '') {
       throw new Error(
         `Line ${tok.lineNo}: "${key}" must be a block list, not an inline value`,
