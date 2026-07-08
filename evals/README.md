@@ -64,6 +64,36 @@ Or via the additive npm script:
 npm run test:evals
 ```
 
+## Over-fire metric (free)
+
+`node evals/overfire.js` runs every case that carries an `expect.fires`
+snapshot through the live hook (`hooks/safety-net.js`) and prints fire-rate per
+boundary class plus the **venting-flow number** — the fraction of realistic
+venting messages the hook interrupts (currently `5/12 = 41.7%`). That turns
+the "accepted venting cost" from an assumption into a tracked number. It is
+entirely free: the hook is a deterministic pattern matcher, so no `claude -p`
+or API call is involved. `--json` gives machine-readable output.
+
+Gate semantics (enforced by `evals/__tests__/overfire.test.js` under
+`npm run test:evals` — which also runs in CI as part of the publish workflow's
+smoke-test job — and by the CLI's exit code):
+
+- **Must-fire hard gate** — every `# intent: must-fire` case (explicit
+  first-person crisis) must LIVE-fire. Any silence fails the suite, per case,
+  naming the phrase.
+- **Snapshot lock** — every case's live result must equal its `expect.fires`
+  snapshot. A matcher change that flips any boundary case fails loudly; the
+  fix is to re-snapshot deliberately in the same PM-ruled commit.
+- **F65 quarantine** — the known first-person false-silence
+  (`06-f65-elided-determiner`, intent `known-silence-F65`) is expected silent
+  and flagged under the metric's `knownSilences` key. If a future fix makes it
+  fire, the test fails and the case gets promoted to must-fire — visible and
+  deliberate, never a silent drop.
+
+Matcher tightenings are PM-gated: this metric provides the evidence (which
+boundary cases flip, and what the venting-flow number does), the PM ruling
+decides.
+
 ## `--mock` is plumbing only
 
 `evals/run.js --mock` runs the whole harness without invoking `claude`, using a

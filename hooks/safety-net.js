@@ -233,6 +233,20 @@ var OVERDOSE_TAIL =
   '|last|twice' +
   '|cent(?:er|re)s?|lines?|logs?|volume|training|shifts?)\\b)';
 
+// NOTE — die-of-embarrassment idiom guard: attempted (crisis-eval-precision
+// T-005) and WITHDRAWN (T-009) after three adversarial review rounds each
+// found a live first-person false-silence corridor in a successive repair
+// (round-1 F1 "of shame" composites; round-2 F17 mid-message punctuation;
+// round-3 F25 newline connectors + F26 method-noun continuations, e.g.
+// "i want to die of embarrassment about the pills" silent). A regex suffix
+// guard on "want to die of X" cannot distinguish hyperbole from a crisis
+// composite, so per the asymmetric-close ruling (over-fire side always)
+// the idiom OVER-FIRES by design: "i want to die of embarrassment" gets
+// the notice, and the notice's own text tells the model to assess context.
+// Measured + gate-locked in evals (05-venting-die-embarrassment,
+// 06-idiom-die-shame). Do not reintroduce a guard here without a PM ruling
+// and corridor-free evidence at eval depth.
+
 // Tier 1: explicit suicidal-ideation / self-harm / method language.
 // Recall-first: within clearly first-person crisis space, prefer to match.
 var TIER1_PATTERNS = [
@@ -260,6 +274,15 @@ var TIER1_PATTERNS = [
   /\bend(?:ing)?\s+my\s+(?:own\s+)?life\b/,
   tp('\\bend(?:ing)?\\s+it\\s+all\\b'),
   /\bwant(?:ed)?\s+to\s+end\s+it\b/,
+  // Round-2 review F19 (recall addition per the asymmetric-close ruling —
+  // "no explicit first-person crisis phrase may be silent"): the plain
+  // future declaration "i am going to end it" matched nothing (tier-1 had
+  // want/thinking/plan heads but not going/gonna). Anti-anchored so
+  // third-person reports ("she is going to end it") stay silent. Accepted
+  // consequence, over-fire side of the ruling: breakup phrasing ("going to
+  // end it with him") fires — measured + gate-locked in the eval corpus;
+  // no "with"-guard because "end it with pills" is method language.
+  tp('\\b(?:going\\s+to|gonna)\\s+end\\s+it\\b'),
   /\bthink(?:ing)?\s+(?:about|of)\s+ending\s+it\b/,
   /\b(?:don'?t|do\s+not)\s+(?:want\s+to|wanna)\s+be\s+here\b/,
   /\b(?:don'?t|do\s+not)\s+(?:want\s+to|wanna)\s+live\b/,
@@ -371,7 +394,24 @@ var TIER2_PATTERNS = [
   /\bno\s+reason\s+to\s+(?:live|go\s+on|keep\s+going)\b/,
   /\bnothing\s+(?:left\s+)?to\s+live\s+for\b/,
   /\bno\s+point\s+in\s+(?:living|going\s+on)\b/,
-  /\bno\s+way\s+out\b/,
+  // Transactional-noun suffix guard (crisis-eval-precision T-005/T-B;
+  // retreated in T-006; end-of-message-bounded in T-008; `\s*$` in T-009
+  // after review round-3 F25): ONLY "of <det> contract/lease" — `contract`
+  // is the measured F12 over-fire noun (06-idiom-f12-no-way-out-contract);
+  // `lease` is inferred from the same measured message ("I read the lease
+  // again...") and fixture-pinned, not separately measured. The determiner
+  // class is broader than the measured "this" — determiners are
+  // semantically neutral for the transactional reading. The guard applies
+  // ONLY when the noun ends the WHOLE MESSAGE (optional trailing
+  // punctuation/whitespace, then true end of input — NOT end of line:
+  // round-3 F25 live-proved "no way out of this contract\ni am done with
+  // everything" must fire; Enter is a connector in distressed typing, the
+  // same class as round-2 F17's comma). Corridor-free by construction:
+  // the only silenced shape is a message that literally ends at the
+  // transactional noun. Recall-first: bare "no way out", "of this
+  // life/pain", "of the contract of my life", and any continuation beyond
+  // a trailing punctuation run — a newline or any text — fires.
+  /\bno\s+way\s+out\b(?!\s+of\s+(?:this|the|that|my|our|a|an)\s+(?:contract|lease)\b *[.!?,;:…]*\s*$)/,
   /\bbetter\s+off\s+if\s+i\s+(?:was|were)\s+gone\b/
 ];
 
