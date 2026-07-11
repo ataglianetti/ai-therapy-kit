@@ -139,6 +139,8 @@ Your AI therapist:
 
 **Profile structure grows with you.** New profiles start with a minimal seed (`Background`, `Current Focus`, `Notes`). Your therapist adds and reorganizes sections as themes emerge across sessions, and organizes structure around your active modalities — IFS work surfaces a `Parts` section, somatic work surfaces `Body & Nervous System`, narrative work surfaces `Preferred Stories`, and so on. The profile reflects the actual shape of the work, not an arbitrary a priori taxonomy.
 
+**Notes about your current life carry a date.** Entries about what you're working on now get a small `(YYYY-MM-DD)` stamp marking when they were last confirmed — so a read that's drifted out of date can be checked with you rather than assumed still true. When something has sat unconfirmed for a while, your therapist may offer, once and at a natural moment, to walk through the stale items and see what still fits (you can also just ask: "review my profile"). Background and history stay undated — they don't go stale the way current-state notes do. Nothing here is ever backfilled with a made-up date; a date means it was actually confirmed with you.
+
 ### Your Files
 
 Everything is stored as simple text files you can read anytime:

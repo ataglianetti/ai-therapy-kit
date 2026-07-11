@@ -267,6 +267,16 @@ export async function doctor(opts) {
   }
   // status 'unknown' (claude not on PATH or unparseable output): skip silently.
 
+  // Profile-protocol presence. Warning (not error) severity: pre-feature
+  // installs that haven't run `update` yet must keep validating clean.
+  if (existsSync(paths.profileProtocol)) {
+    ok.push('.therapy/profile-protocol.md present');
+  } else {
+    warnings.push(
+      'profile-protocol.md missing (.therapy/profile-protocol.md) — the profile provenance rules (dated writes + staleness review) are not installed. Run `inner-dialogue update` to install it.'
+    );
+  }
+
   if (existsSync(paths.context)) {
     ok.push('context/ folder present');
     if (!existsSync(paths.contextIndex)) {
