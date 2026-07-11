@@ -2,7 +2,7 @@
 
 *This document evolves across sessions as themes emerge. Your therapist will add, expand, and reorganize sections based on the work you do together.*
 
-*You may notice dates like *(2026-07-11)* on entries about your current life — they mark when something was last confirmed, so a note that's gone stale can be checked with you rather than assumed still true. Background and history stay undated. This is normal and nothing you need to manage.*
+*You may notice a date like (2026-07-11) on entries about your current life — it marks when something was last confirmed, so a note that's gone stale can be checked with you rather than assumed still true. Background and history stay undated. This is normal and nothing you need to manage.*
 
 ---
 

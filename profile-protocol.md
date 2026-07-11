@@ -30,7 +30,9 @@ At session start, after the normal reads, check the profile's **current-state** 
 
 > Any current-state item dated more than **~90 days** ago, **and** at least **~3 session files in `sessions/` dated after that item** — i.e. the client has actually been in three or more times since the claim was last confirmed and it still went untouched.
 
-(Count from `sessions/` filenames — they are `YYYY-MM-DD.md`. Undated legacy content is treated as stale for this purpose; see *Migration*.)
+(Count from `sessions/` filenames — they are `YYYY-MM-DD.md`.)
+
+**Undated legacy content** has no date to measure from, so treat the ~90-day clause as already satisfied — but the ~3-sessions clause still applies, measured against **total session history**: only offer once the record holds at least ~3 sessions. This is what keeps a brand-new client (or one you've only seen once or twice) from being asked to review notes there's barely been time to form. See *Migration*.
 
 If the trigger is met **and the session opens neutrally**, offer — **once**, at a natural lull, in the seeding-offer's spirit:
 
@@ -38,7 +40,7 @@ If the trigger is met **and the session opens neutrally**, offer — **once**, a
 
 - **The person outranks the housekeeping.** Never open a heavy or emotionally-loaded session with this. If the client arrives with something pressing, stay with it and let the offer wait for a lull or a later session — the notes can wait, the person can't. This is the same rule the seeding offer carries.
 - **If they engage** → walk the stale items conversationally, **one at a time, as questions not assertions**: "I've got that you're focused on X — is that still where it's at?" Update, delete, or leave per their answer; refresh the date on whatever they confirm. Hold each item as a hypothesis you're offering back for confirmation, never as a fact you're reporting.
-- **If they decline** → write a dated marker into `profile.md` — an HTML comment, `<!-- profile review offered and declined: YYYY-MM-DD -->` — and don't re-offer for **~30 days**. Same anti-nag mechanics as the seeding decline marker. They can still ask for the walk-through any time (see §3).
+- **If they decline** → write a dated marker into `profile.md` — an HTML comment, `<!-- profile review offered and declined: YYYY-MM-DD -->` — and don't re-offer for **~30 days**. Same *kind* of anti-nag marker as the seeding decline, but time-boxed rather than permanent: a profile goes stale again over time, so the offer should be able to return after a while, where seeding is a one-time event that never re-fires. They can still ask for the walk-through any time (see §3).
 
 ## 3. The command
 
@@ -48,4 +50,4 @@ If the trigger is met **and the session opens neutrally**, offer — **once**, a
 
 Existing profiles are entirely undated. **Do not fabricate dates.** An invented date is a false provenance claim — worse than none, because it launders a stale inference as freshly confirmed. This is the same content-integrity rule the whole framework runs on.
 
-Undated current-state content is treated as **"stale, provenance unknown"** — exactly what the first review ritual is for. It counts as stale for the trigger. After one or two reviews, the profile converges to fully dated through confirmation alone, with nothing fabricated along the way.
+Undated current-state content is treated as **"stale, provenance unknown"** — exactly what the first review ritual is for. It satisfies the staleness (~90-day) clause of the trigger; the ~3-sessions gate still applies (measured against total session history — see §2), so the review only surfaces once there's a real record behind it. After one or two reviews, the profile converges to fully dated through confirmation alone, with nothing fabricated along the way.

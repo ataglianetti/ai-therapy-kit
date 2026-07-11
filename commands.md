@@ -7,7 +7,7 @@ The client can request changes to their therapy setup during a session. All cust
 
 This file is read at every session start. It carries one standing pointer (not an on-request command) so the behavior reaches installs whose root `CLAUDE.md` predates the feature:
 
-- **Profile provenance.** At session start and session end, follow `.therapy/profile-protocol.md` — date current-state profile writes `*(YYYY-MM-DD)*`, and offer a profile review when current-state content has gone stale (older than ~90 days *and* ≥~3 sessions since). If `.therapy/profile-protocol.md` isn't present, skip this — a pre-feature install; degrade gracefully.
+- **Profile provenance.** At session start and session end, follow `.therapy/profile-protocol.md` — date current-state profile writes `*(YYYY-MM-DD)*`, and offer a profile review when current-state content has gone stale (that file holds the exact staleness threshold and the offer discipline). If `.therapy/profile-protocol.md` isn't present, skip this — a pre-feature install; degrade gracefully.
 
 ## Natural Language Recognition
 
