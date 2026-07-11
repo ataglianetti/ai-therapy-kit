@@ -15,6 +15,12 @@
       "required": true,
       "description": "Customization commands (import, update, persona, etc.)"
     },
+    "profile-protocol": {
+      "file": "profile-protocol.md",
+      "target": ".therapy/profile-protocol.md",
+      "required": true,
+      "description": "Profile provenance rules: date-stamped writes + staleness review ritual. Read at session start (new installs via CLAUDE.md; existing installs via the commands.md pointer)."
+    },
     "safety-net": {
       "file": "hooks/safety-net.js",
       "target": ".therapy/hooks/safety-net.js",

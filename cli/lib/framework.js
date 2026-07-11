@@ -6,6 +6,7 @@ import { hashString, extractVersion } from './hash.js';
 const SINGLE_FILES = [
   { source: 'safety-protocol.md', target: '.therapy/safety-protocol.md' },
   { source: 'commands.md', target: '.therapy/commands.md' },
+  { source: 'profile-protocol.md', target: '.therapy/profile-protocol.md' },
   { source: 'hooks/safety-net.js', target: '.therapy/hooks/safety-net.js' },
 ];
 

@@ -19,6 +19,7 @@
     "context/",
     "safety-protocol.md",
     "commands.md",
+    "profile-protocol.md",
     "CLAUDE.template.md",
     "profile.template.md",
     "claude-settings.template.json",
