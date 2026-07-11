@@ -1,7 +1,13 @@
-<!-- version: 1.4.0 -->
+<!-- version: 1.5.0 -->
 # Customization Commands
 
 The client can request changes to their therapy setup during a session. All customization files are stored locally in `.therapy/library/`.
+
+## Always-on protocol pointer
+
+This file is read at every session start. It carries one standing pointer (not an on-request command) so the behavior reaches installs whose root `CLAUDE.md` predates the feature:
+
+- **Profile provenance.** At session start and session end, follow `.therapy/profile-protocol.md` — date current-state profile writes `*(YYYY-MM-DD)*`, and offer a profile review when current-state content has gone stale (older than ~90 days *and* ≥~3 sessions since). If `.therapy/profile-protocol.md` isn't present, skip this — a pre-feature install; degrade gracefully.
 
 ## Natural Language Recognition
 
@@ -31,6 +37,10 @@ Recognize conversational requests, not just exact command phrases:
 **For context-library seeding** (triggers supervised backfill from history):
 - "seed my context library", "build my context library", "catch up on my history"
 - "go through my old sessions and start notes on the people and themes"
+
+**For profile review** (triggers the profile provenance walk-through):
+- "review my profile", "check my profile", "go over what you have about me"
+- "are your notes about me still accurate?", "update your notes on me"
 
 ## When persona change is triggered
 
@@ -138,6 +148,16 @@ The therapist does this, not the CLI — it requires reading and judgment. It is
 4. Write only confirmed subjects. Flag each `**Provisional (YYYY-MM-DD)**` and mark the file as distilled-from-history, not yet confirmed live — it graduates to Active or Core once worked with in a live session.
 5. Respect `therapist:`-frontmatter sessions: a subject from a real provider's records is valid context, but note the provider as the source and defer clinical authority (see *Working Alongside Real-World Care* in `CLAUDE.md`).
 
+## When client asks to "review my profile"
+
+The client-initiated version of the profile provenance walk-through (see `.therapy/profile-protocol.md`). Available any time, regardless of whether content has hit the staleness trigger. It is also the on-demand migration path for legacy undated profiles — each review backfills dates as items get confirmed.
+
+1. Read `profile.md`. Focus on **current-state** sections (Current Focus, Notes, and any current-state H2 that's emerged). Leave `Background`/formative history alone — it's undated by design.
+2. Walk the items conversationally, **one at a time, as questions not assertions**: "I've got that you're focused on X — is that still where it's at?" Favor the stalest (oldest-dated or undated) items; don't grind through every line.
+3. Per the client's answer: update the wording, delete what no longer holds, or leave it — and **refresh the date `*(YYYY-MM-DD)*` on whatever they confirm** (only what they actually re-confirmed; never bulk-stamp).
+4. Never fabricate a date for undated legacy content — a date is a promise it was confirmed live. It earns its date the moment the client confirms it here.
+5. Keep it light and optional. If the client would rather not, that's fine — drop it and move on.
+
 ## Help & Discoverability
 
 When client asks "what can you do?", "help", or "what can I customize?" (in non-crisis context):
@@ -145,6 +165,7 @@ When client asks "what can you do?", "help", or "what can I customize?" (in non-
 > Besides our regular sessions, I can:
 > - Import notes from other tools (ChatGPT exports, journals, etc.)
 > - Build a context library from our past sessions (the people, places, and recurring themes in your life)
+> - Review my notes about you to make sure they're still accurate
 > - Adjust my communication style (more direct, warmer, etc.)
 > - Add or remove therapeutic approaches (CBT, somatic work, etc.)
 > - Change session structure (more/less homework)
