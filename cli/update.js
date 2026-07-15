@@ -12,7 +12,13 @@ import {
 } from './lib/version.js';
 import { hashString } from './lib/hash.js';
 import { snapshotTherapy } from './lib/backup.js';
-import { planSafetyNetMerge, applySafetyNetMerge } from './lib/settings.js';
+import {
+  planSafetyNetMerge,
+  planHookMerge,
+  applyHookMerge,
+  SAFETY_NET_DESC,
+  USAGE_STATS_DESC,
+} from './lib/settings.js';
 
 const ALWAYS_SKIP_RELATIVE = [
   'profile.md',
@@ -107,6 +113,13 @@ export async function update(opts) {
   plan.settings_merge = [];
   const settingsMergePlan = await planSafetyNetMerge(paths.claudeSettings);
   if (settingsMergePlan) plan.settings_merge.push(settingsMergePlan);
+  // Also plan the usage-stats SessionStart hook registration into a
+  // pre-existing settings file (same surgical, fail-open contract).
+  const usageMergePlan = await planHookMerge(
+    paths.claudeSettings,
+    USAGE_STATS_DESC
+  );
+  if (usageMergePlan) plan.settings_merge.push(usageMergePlan);
 
   for (const f of framework) {
     if (isProtected(f.target)) continue;
@@ -326,8 +339,11 @@ export async function update(opts) {
     (plan.forced_overwrites?.length || 0) +
     plan.legacy_removed.length +
     plan.scaffolded.length +
-    plan.settings_merge.filter((m) => m.action === 'add_safety_net_hook')
-      .length;
+    plan.settings_merge.filter(
+      (m) =>
+        m.action === 'add_safety_net_hook' ||
+        m.action === 'add_usage_stats_hook'
+    ).length;
   const willMigrateRegistry =
     isLegacySchema && plan.unchanged.length > 0;
 
@@ -407,14 +423,19 @@ export async function update(opts) {
   // re-verifies the file rather than trusting state captured at planning time,
   // so if the file changed underneath us the item downgrades to a skip with a
   // reason instead of silently no-opping or clobbering.
+  const MERGE_DESC_BY_ACTION = {
+    add_safety_net_hook: SAFETY_NET_DESC,
+    add_usage_stats_hook: USAGE_STATS_DESC,
+  };
   for (const item of plan.settings_merge) {
-    if (item.action !== 'add_safety_net_hook') continue;
-    // applySafetyNetMerge is fail-soft: an fs failure inside the merge comes
+    const desc = MERGE_DESC_BY_ACTION[item.action];
+    if (!desc) continue;
+    // applyHookMerge is fail-soft: an fs failure inside the merge comes
     // back as { merged: false, code: 'error', reason } rather than throwing,
     // so the run completes (framework files are already written above and
     // version.json is written below — a crash here would leave a stale hash
     // registry and doctor would false-flag every updated file as "modified").
-    const mergeResult = await applySafetyNetMerge(paths.claudeSettings);
+    const mergeResult = await applyHookMerge(paths.claudeSettings, desc);
     if (mergeResult.merged) {
       item.backup = mergeResult.backup;
     } else {

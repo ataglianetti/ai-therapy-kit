@@ -9,7 +9,12 @@ import { packageFile, therapyPaths, expandHome } from './lib/paths.js';
 import { loadFramework, listLibrary, libraryAbsolute } from './lib/framework.js';
 import { emptyVersionJson, recordFile, writeVersionJson } from './lib/version.js';
 import { hashString } from './lib/hash.js';
-import { applySafetyNetMerge, SETTINGS_REL_PATH } from './lib/settings.js';
+import {
+  applySafetyNetMerge,
+  applyHookMerge,
+  USAGE_STATS_DESC,
+  SETTINGS_REL_PATH,
+} from './lib/settings.js';
 
 const PERSONA_LABELS = {
   'warm-4o': 'Warm 4o-Style',
@@ -244,6 +249,25 @@ export async function install(rawOpts) {
         path: SETTINGS_REL_PATH,
         action: 'skipped',
         reason: mergeResult.reason,
+      });
+    }
+    // Also register the usage-stats SessionStart hook into the pre-existing
+    // settings file. Same fail-soft contract as the safety-net merge above.
+    const usageResult = await applyHookMerge(
+      paths.claudeSettings,
+      USAGE_STATS_DESC
+    );
+    if (usageResult.merged) {
+      settingsMerge.push({
+        path: SETTINGS_REL_PATH,
+        action: 'add_usage_stats_hook',
+        backup: usageResult.backup,
+      });
+    } else if (usageResult.code !== 'already_registered') {
+      settingsMerge.push({
+        path: SETTINGS_REL_PATH,
+        action: 'skipped',
+        reason: usageResult.reason,
       });
     }
   }
