@@ -20,6 +20,7 @@
     "safety-protocol.md",
     "commands.md",
     "profile-protocol.md",
+    "usage-reflection.md",
     "CLAUDE.template.md",
     "profile.template.md",
     "claude-settings.template.json",
