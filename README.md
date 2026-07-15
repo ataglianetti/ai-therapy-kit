@@ -207,6 +207,16 @@ Honest framing of what it is and isn't:
 
 The `doctor` command checks that the script is present, unmodified, and registered. You're free to edit it, but we recommend you don't — the safety net is there for a reason. The hook requires Claude Code 2.1.139 or newer; `doctor` warns if your installed version is older.
 
+### Usage-pattern reflection
+
+Every install also includes a `SessionStart` hook that records session timing to a **local** plain-text file (`.therapy/usage-log.txt`) and computes a few simple cadence facts — how often you come in, time of day, and how that trends against your own baseline.
+
+Why it's there:
+
+- **It's a counterweight to memory.** A tool that remembers everything, forever, can quietly encourage leaning on it. This gives your AI therapist the option to gently reflect your usage back to you, in service of your own independent functioning rather than dependency. It raises this with judgment, at most once, and drops it if you ask.
+- **Nothing leaves the machine.** No telemetry, no usage caps, no lockouts. The log is plain text, readable by you, and delete-able like everything else in your folder.
+- **It is not a crisis mechanism.** Session timing says nothing about how you're doing. Crisis handling stays with the safety protocol and the mechanical layer above.
+
 ---
 
 ## Privacy

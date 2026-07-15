@@ -69,6 +69,7 @@ function makeInstall({
     'persona.md',
     'session-structure.md',
     'commands.md',
+    'usage-reflection.md',
   ]) {
     writeFileSync(path.join(therapy, f), `# ${f}\n`);
   }
@@ -81,9 +82,17 @@ function makeInstall({
   mkdirSync(path.join(root, 'context'), { recursive: true });
   writeFileSync(path.join(root, 'context', 'index.md'), '# Index\n');
 
+  // The usage-stats hook is not the subject of this suite; ship it so the
+  // fixture keeps its "passes every other doctor check" contract (otherwise
+  // doctor's usage-stats checks would emit their own missing-file warnings).
+  const hooksDir = path.join(therapy, 'hooks');
+  mkdirSync(hooksDir, { recursive: true });
+  writeFileSync(
+    path.join(hooksDir, 'usage-stats.js'),
+    '// fixture stand-in for the usage-stats hook\n'
+  );
+
   if (hookScript) {
-    const hooksDir = path.join(therapy, 'hooks');
-    mkdirSync(hooksDir, { recursive: true });
     writeFileSync(path.join(hooksDir, 'safety-net.js'), hookContent);
   }
 

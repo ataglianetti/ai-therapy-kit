@@ -34,6 +34,17 @@ const CANONICAL_ENTRY = {
   ],
 };
 
+const CANONICAL_USAGE_STATS_ENTRY = {
+  matcher: 'startup|resume|clear|compact',
+  hooks: [
+    {
+      type: 'command',
+      command: 'node',
+      args: ['${CLAUDE_PROJECT_DIR}/.therapy/hooks/usage-stats.js'],
+    },
+  ],
+};
+
 // A pre-safety-net settings file: the shipped time hook plus an unrelated
 // user customization. Both must survive the merge untouched.
 const TIME_HOOK_SETTINGS = {
@@ -47,6 +58,43 @@ const TIME_HOOK_SETTINGS = {
     ],
   },
 };
+
+// A settings file that already carries BOTH UserPromptSubmit hooks (the time
+// hook and the safety-net hook) but no SessionStart hook. Used to isolate the
+// usage-stats SessionStart merge: only that hook should be added, and the two
+// existing UserPromptSubmit hooks must be left untouched.
+const TWO_UPS_HOOKS_SETTINGS = {
+  customKey: { keep: 'me' },
+  hooks: {
+    UserPromptSubmit: [
+      {
+        matcher: '',
+        hooks: [{ type: 'command', command: 'date "+%A %Y-%m-%d %H:%M"' }],
+      },
+      {
+        matcher: '',
+        hooks: [
+          {
+            type: 'command',
+            command: 'node',
+            args: ['${CLAUDE_PROJECT_DIR}/.therapy/hooks/safety-net.js'],
+          },
+        ],
+      },
+    ],
+  },
+};
+
+function usageStatsEntries(settings) {
+  return (settings.hooks?.SessionStart || []).filter((entry) =>
+    (entry.hooks || []).some(
+      (h) =>
+        (typeof h.command === 'string' && h.command.includes('usage-stats.js')) ||
+        (Array.isArray(h.args) &&
+          h.args.some((a) => typeof a === 'string' && a.includes('usage-stats.js')))
+    )
+  );
+}
 
 function runJson(args, label) {
   const result = spawnSync('node', [CLI_PATH, ...args, '--json'], {
@@ -104,14 +152,23 @@ test('merge appends exec-form entry, preserves existing content, snapshots first
     assert.equal(res.status, 0, `exit 0 (stderr: ${res.stderr})`);
     assert.equal(res.json.ok, true);
 
+    // Update now merges BOTH hooks into a pre-existing settings file: the
+    // safety-net hook (UserPromptSubmit) and the usage-stats hook
+    // (SessionStart). Assert the merge SET rather than a single item.
     const merges = res.json.plan.settings_merge;
     assert.ok(Array.isArray(merges), 'plan.settings_merge is an array');
-    assert.equal(merges.length, 1);
-    assert.equal(merges[0].path, '.claude/settings.json');
-    assert.equal(merges[0].action, 'add_safety_net_hook');
-    assert.ok(
-      merges[0].backup.includes('settings.json.bak-'),
-      'merge item reports its backup path'
+    assert.equal(merges.length, 2, 'both hooks merged');
+    for (const m of merges) {
+      assert.equal(m.path, '.claude/settings.json');
+      assert.ok(
+        m.backup.includes('settings.json.bak-'),
+        'merge item reports its backup path'
+      );
+    }
+    assert.deepEqual(
+      merges.map((m) => m.action).sort(),
+      ['add_safety_net_hook', 'add_usage_stats_hook'],
+      'the merge set adds the safety-net (UserPromptSubmit) and usage-stats (SessionStart) hooks'
     );
 
     const raw = readFileSync(settingsPath, 'utf8');
@@ -136,15 +193,32 @@ test('merge appends exec-form entry, preserves existing content, snapshots first
     );
     assert.deepEqual(entries[1], CANONICAL_ENTRY, 'canonical exec-form entry appended');
 
+    // The usage-stats hook is registered under a fresh SessionStart group.
+    const sessionStart = settings.hooks.SessionStart;
+    assert.equal(sessionStart.length, 1, 'one SessionStart entry');
+    assert.deepEqual(
+      sessionStart[0],
+      CANONICAL_USAGE_STATS_ENTRY,
+      'canonical usage-stats SessionStart entry appended'
+    );
+
     const baks = settingsBackups(root);
     assert.equal(baks.length, 1, 'exactly one settings backup created');
+    // The two merges run in the same second and share one backup filename; the
+    // usage-stats merge re-snapshots after the safety-net append, so the
+    // surviving backup is a genuine pre-write snapshot (unrelated key intact,
+    // SessionStart not yet registered).
     const bak = JSON.parse(
       readFileSync(path.join(root, '.claude', baks[0]), 'utf8')
     );
-    assert.equal(
-      bak.hooks.UserPromptSubmit.length,
-      1,
-      'backup holds pre-merge content'
+    assert.deepEqual(
+      bak.customKey,
+      { keep: 'me' },
+      'backup holds a pre-merge snapshot'
+    );
+    assert.ok(
+      !bak.hooks.SessionStart,
+      'backup predates the usage-stats SessionStart registration'
     );
 
     // F19: the merge writes via temp-file + rename. Nothing but the settings
@@ -203,10 +277,13 @@ test('malformed settings.json is reported, untouched, and does not change the ex
     assert.equal(res.status, 0, `exit code unchanged (stderr: ${res.stderr})`);
     assert.equal(res.json.ok, true);
 
+    // Both merges (safety-net + usage-stats) skip on malformed JSON.
     const merges = res.json.plan.settings_merge;
-    assert.equal(merges.length, 1);
-    assert.equal(merges[0].action, 'skipped');
-    assert.ok(merges[0].reason, 'skip carries a reason');
+    assert.equal(merges.length, 2, 'both merges skip on malformed JSON');
+    for (const m of merges) {
+      assert.equal(m.action, 'skipped');
+      assert.ok(m.reason, 'skip carries a reason');
+    }
 
     assert.equal(
       readFileSync(settingsPath, 'utf8'),
@@ -231,8 +308,12 @@ test('--dry-run reports the merge without writing', () => {
     assert.equal(res.json.dry_run, true);
 
     const merges = res.json.plan.settings_merge;
-    assert.equal(merges.length, 1);
-    assert.equal(merges[0].action, 'add_safety_net_hook');
+    assert.equal(merges.length, 2, 'both hooks planned');
+    assert.deepEqual(
+      merges.map((m) => m.action).sort(),
+      ['add_safety_net_hook', 'add_usage_stats_hook'],
+      'both the safety-net and usage-stats hooks are planned'
+    );
 
     assert.equal(
       readFileSync(settingsPath, 'utf8'),
@@ -322,13 +403,16 @@ test(
       assert.equal(res.status, 0, `exit 0 (stderr: ${res.stderr})`);
       assert.equal(res.json.ok, true, 'run completes despite the fs failure');
 
+      // Both merges downgrade to a skip carrying the fs error.
       const merges = res.json.plan.settings_merge;
-      assert.equal(merges.length, 1);
-      assert.equal(merges[0].action, 'skipped');
-      assert.ok(
-        merges[0].reason.includes('settings merge failed'),
-        `skip reason carries the error: ${merges[0].reason}`
-      );
+      assert.equal(merges.length, 2, 'both merges skip on the fs failure');
+      for (const m of merges) {
+        assert.equal(m.action, 'skipped');
+        assert.ok(
+          m.reason.includes('settings merge failed'),
+          `skip reason carries the error: ${m.reason}`
+        );
+      }
 
       assert.equal(
         readFileSync(settingsPath, 'utf8'),
@@ -380,9 +464,12 @@ test(
   }
 );
 
-test('already registered via shell-form command string is a no-op', () => {
+test('both hooks already registered via shell-form command strings is a no-op', () => {
   const { dir, root, settingsPath } = freshInstall();
   try {
+    // Both hooks are registered in shell-form (single command string) rather
+    // than the canonical exec-form. The marker substring match must recognize
+    // each as already present, so neither merge fires.
     const shellForm = {
       hooks: {
         UserPromptSubmit: [
@@ -393,6 +480,18 @@ test('already registered via shell-form command string is a no-op', () => {
                 type: 'command',
                 command:
                   'node "$CLAUDE_PROJECT_DIR/.therapy/hooks/safety-net.js"',
+              },
+            ],
+          },
+        ],
+        SessionStart: [
+          {
+            matcher: 'startup|resume|clear|compact',
+            hooks: [
+              {
+                type: 'command',
+                command:
+                  'node "$CLAUDE_PROJECT_DIR/.therapy/hooks/usage-stats.js"',
               },
             ],
           },
@@ -413,6 +512,101 @@ test('already registered via shell-form command string is a no-op', () => {
       'file unchanged'
     );
     assert.equal(settingsBackups(root).length, 0, 'no backup created');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// T-203/T-302: with the safety-net hook already registered under
+// UserPromptSubmit, update merges ONLY the usage-stats SessionStart hook — and
+// leaves the two pre-existing UserPromptSubmit hooks alone.
+test('update registers the SessionStart usage-stats hook without disturbing the UserPromptSubmit hooks', () => {
+  const { dir, root, settingsPath } = freshInstall();
+  try {
+    writeFileSync(
+      settingsPath,
+      JSON.stringify(TWO_UPS_HOOKS_SETTINGS, null, 2) + '\n'
+    );
+
+    const res = runJson(['update', '--path', root], 'update sessionstart');
+    assert.equal(res.status, 0, `exit 0 (stderr: ${res.stderr})`);
+    assert.equal(res.json.ok, true);
+
+    // The safety-net hook is already present, so only the usage-stats hook is
+    // added.
+    assert.deepEqual(
+      res.json.plan.settings_merge.map((m) => m.action),
+      ['add_usage_stats_hook'],
+      'only the SessionStart usage-stats hook is merged'
+    );
+
+    const settings = JSON.parse(readFileSync(settingsPath, 'utf8'));
+
+    // A SessionStart group is created with the canonical matcher and command.
+    const sessionStart = settings.hooks.SessionStart;
+    assert.equal(sessionStart.length, 1, 'one SessionStart entry');
+    assert.equal(
+      sessionStart[0].matcher,
+      'startup|resume|clear|compact',
+      'SessionStart matcher'
+    );
+    assert.deepEqual(
+      sessionStart[0],
+      CANONICAL_USAGE_STATS_ENTRY,
+      'canonical usage-stats SessionStart entry, command references usage-stats.js'
+    );
+
+    // The two pre-existing UserPromptSubmit hooks are untouched.
+    assert.equal(
+      settings.hooks.UserPromptSubmit.length,
+      2,
+      'UserPromptSubmit count unchanged (stays 2)'
+    );
+    assert.equal(
+      settings.hooks.UserPromptSubmit[0].hooks[0].command,
+      'date "+%A %Y-%m-%d %H:%M"',
+      'the pre-existing time hook is preserved in place'
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('second update does not double-register the SessionStart usage-stats hook', () => {
+  const { dir, root, settingsPath } = freshInstall();
+  try {
+    writeFileSync(
+      settingsPath,
+      JSON.stringify(TWO_UPS_HOOKS_SETTINGS, null, 2) + '\n'
+    );
+    const first = runJson(['update', '--path', root], 'first update');
+    assert.deepEqual(
+      first.json.plan.settings_merge.map((m) => m.action),
+      ['add_usage_stats_hook'],
+      'first run merges the usage-stats hook'
+    );
+
+    const second = runJson(['update', '--path', root], 'second update');
+    assert.equal(second.status, 0);
+    assert.equal(second.json.ok, true);
+    assert.deepEqual(
+      second.json.plan.settings_merge,
+      [],
+      'second run plans no merge'
+    );
+
+    const settings = JSON.parse(readFileSync(settingsPath, 'utf8'));
+    assert.equal(
+      usageStatsEntries(settings).length,
+      1,
+      'exactly one SessionStart usage-stats entry'
+    );
+    assert.equal(
+      settings.hooks.UserPromptSubmit.length,
+      2,
+      'UserPromptSubmit count still 2'
+    );
+    assert.equal(settingsBackups(root).length, 1, 'no second backup created');
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

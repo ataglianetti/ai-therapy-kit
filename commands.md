@@ -1,4 +1,4 @@
-<!-- version: 1.5.0 -->
+<!-- version: 1.6.0 -->
 # Customization Commands
 
 The client can request changes to their therapy setup during a session. All customization files are stored locally in `.therapy/library/`.
@@ -8,6 +8,7 @@ The client can request changes to their therapy setup during a session. All cust
 This file is read at every session start. It carries one standing pointer (not an on-request command) so the behavior reaches installs whose root `CLAUDE.md` predates the feature:
 
 - **Profile provenance.** At session start and session end, follow `.therapy/profile-protocol.md` — date current-state profile writes `*(YYYY-MM-DD)*`, and offer a profile review when current-state content has gone stale (that file holds the exact staleness threshold and the offer discipline). If `.therapy/profile-protocol.md` isn't present, skip this — a pre-feature install; degrade gracefully.
+- **Usage-pattern reflection.** At session start, follow `.therapy/usage-reflection.md` — how to hold the mechanical usage-cadence facts the SessionStart hook may inject (raise gently, at most once, at a lull; respect a decline marker durably; it is never a crisis screen — heavy use plus crisis routes to `.therapy/safety-protocol.md`). If `.therapy/usage-reflection.md` isn't present, skip — a pre-feature install; degrade gracefully.
 
 ## Natural Language Recognition
 

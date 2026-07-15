@@ -8,6 +8,8 @@ const SINGLE_FILES = [
   { source: 'commands.md', target: '.therapy/commands.md' },
   { source: 'profile-protocol.md', target: '.therapy/profile-protocol.md' },
   { source: 'hooks/safety-net.js', target: '.therapy/hooks/safety-net.js' },
+  { source: 'hooks/usage-stats.js', target: '.therapy/hooks/usage-stats.js' },
+  { source: 'usage-reflection.md', target: '.therapy/usage-reflection.md' },
 ];
 
 const LIBRARY_DIRS = [
