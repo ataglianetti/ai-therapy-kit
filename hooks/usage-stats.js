@@ -39,7 +39,8 @@
 // >=22.3) returns a core module WITHOUT import or require, so it is the one
 // globals-only way to reach fs/path under both parse modes. A `typeof` guard
 // on the CJS `require` fallback keeps ESM from throwing a ReferenceError on
-// older runtimes; any throw here is still caught by the fail-open wrapper.
+// older runtimes. A throw here is caught by the load-time guard below, which
+// leaves FS/PATH undefined so the hook fails open (main + resolveRoot no-op).
 function coreModule(name) {
   if (
     typeof process !== 'undefined' &&
@@ -51,8 +52,17 @@ function coreModule(name) {
   throw new Error('no module loader available');
 }
 
-var FS = coreModule('fs');
-var PATH = coreModule('path');
+// Resolve fs/path at module load. This runs BEFORE main's try/catch, so it
+// needs its OWN guard: on failure FS/PATH stay undefined and every later
+// FS/PATH access throws into a fail-open catch (main's, or resolveRoot's
+// per-candidate try), so the process still exits 0 with no output.
+var FS, PATH;
+try {
+  FS = coreModule('fs');
+  PATH = coreModule('path');
+} catch (err) {
+  // Module resolution failed — leave FS/PATH undefined; the hook fails open.
+}
 
 // --- Tunables --------------------------------------------------------------
 var WINDOW_DAYS = 14; // trailing window for the recent session count
@@ -172,15 +182,33 @@ function readSessionDays(root) {
     if (!/\.md$/i.test(name)) continue;
     var m = name.match(/^(\d{4})-(\d{2})-(\d{2})/);
     if (!m) continue;
-    var dayMs = Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+    var y = Number(m[1]);
+    var mo = Number(m[2]);
+    var d = Number(m[3]);
+    var dayMs = Date.UTC(y, mo - 1, d);
     if (isNaN(dayMs)) continue;
+    // Date.UTC ROLLS OVER out-of-range parts (2025-13-45 => 2026-02-14)
+    // instead of returning NaN. Reject anything that doesn't round-trip, so a
+    // phantom filename can't manufacture a session day.
+    var back = new Date(dayMs);
+    if (
+      back.getUTCFullYear() !== y ||
+      back.getUTCMonth() !== mo - 1 ||
+      back.getUTCDate() !== d
+    ) {
+      continue;
+    }
     days.push(Math.floor(dayMs / MS_PER_DAY));
   }
   return days;
 }
 
-// Parse ISO timestamps (first tab-delimited field) from the log.
-function readLogTimestamps(root) {
+// Parse ISO timestamps (first tab-delimited field) from the log. Skip any line
+// whose marker (the field after the tab) equals `excludeMarker` — this drops
+// the CURRENT session's own entry so the cluster describes PRIOR sessions only.
+// Robust on both first-fire (entry just appended) and a compact re-fire (entry
+// already present): either way the current marker is filtered out.
+function readLogTimestamps(root, excludeMarker) {
   var logPath = PATH.join(root, '.therapy', 'usage-log.txt');
   var raw;
   try {
@@ -195,6 +223,8 @@ function readLogTimestamps(root) {
     if (!ln) continue;
     var tab = ln.indexOf('\t');
     var stamp = tab === -1 ? ln : ln.slice(0, tab);
+    var mk = tab === -1 ? null : ln.slice(tab + 1);
+    if (excludeMarker != null && mk === excludeMarker) continue;
     var t = Date.parse(stamp);
     if (!isNaN(t)) out.push(t);
   }
@@ -229,22 +259,26 @@ function timeOfDayCluster(timestamps) {
   for (var i = 0; i < recent.length; i++) {
     hours.push(new Date(recent[i]).getHours());
   }
-  var best = { count: 0, lo: 0, hi: 0 };
+  var best = { count: 0, lo: 0 };
   for (var a = 0; a < hours.length; a++) {
     var lo = hours[a];
     var count = 0;
-    var maxHour = lo;
     for (var b = 0; b < hours.length; b++) {
-      if (hours[b] >= lo && hours[b] <= lo + CLUSTER_SPAN_HOURS) {
+      // CIRCULAR hour distance so a band can wrap past midnight: with lo=22
+      // and a 3-hour span, hours 22, 23, 0, 1 all fall inside. A plain
+      // `h >= lo && h <= lo + span` comparison could never span the 23->0
+      // boundary, so late-night clusters straddling midnight never formed.
+      if (((hours[b] - lo + 24) % 24) <= CLUSTER_SPAN_HOURS) {
         count++;
-        if (hours[b] > maxHour) maxHour = hours[b];
       }
     }
-    if (count > best.count) best = { count: count, lo: lo, hi: maxHour };
+    if (count > best.count) best = { count: count, lo: lo };
   }
   if (best.count < CLUSTER_MIN_IN_BAND) return null;
   var bandStart = pad2(best.lo) + ':00';
-  var bandEnd = pad2(best.hi + 1) + ':00';
+  // Display the fixed band end (lo + span), wrapped mod 24, so it reads
+  // "22:00–01:00" across midnight rather than an un-wrapped hour.
+  var bandEnd = pad2((best.lo + CLUSTER_SPAN_HOURS) % 24) + ':00';
   return (
     best.count +
     ' of the last ' +
@@ -278,8 +312,13 @@ function largestRecentGap(days, nowDay) {
 
 // Build the fact list. Returns [] when there is nothing meaningful to say
 // (which, combined with the < MIN_TOTAL_SESSIONS gate, keeps the hook silent).
-function computeFacts(root, refMs) {
-  var days = readSessionDays(root); // may throw => caller fails open
+function computeFacts(root, refMs, marker) {
+  // Dedup to UNIQUE DAYS once, up front, so count, baseline, gap, and trend
+  // all share one unit. Sessions are date-only: two files on the same date
+  // (e.g. 2026-06-01.md + 2026-06-01-import.md) are one distinguishable
+  // session-day. Counting files instead would bias the trend toward "up" and
+  // let "N sessions in 14 days" exceed the number of distinct days.
+  var days = uniqueSorted(readSessionDays(root)); // may throw => caller fails open
   var totalSessions = days.length;
   if (totalSessions < MIN_TOTAL_SESSIONS) return []; // silence gate
 
@@ -290,9 +329,14 @@ function computeFacts(root, refMs) {
   var priorDays = [];
   for (var i = 0; i < days.length; i++) {
     var age = nowDay - days[i];
-    if (age >= 0 && age <= WINDOW_DAYS) {
+    if (age < 0) continue; // future-dated filename: ignore
+    // "last WINDOW_DAYS days" == ages 0..WINDOW_DAYS-1 (exactly WINDOW_DAYS
+    // calendar days), matching the label and the /(WINDOW_DAYS/7) divisor. A
+    // day at exactly age WINDOW_DAYS is the day *before* the window and counts
+    // toward the prior baseline.
+    if (age < WINDOW_DAYS) {
       recentCount++;
-    } else if (days[i] < windowStart) {
+    } else {
       priorDays.push(days[i]);
     }
   }
@@ -328,20 +372,20 @@ function computeFacts(root, refMs) {
     );
   }
 
-  var cluster = timeOfDayCluster(readLogTimestamps(root));
+  // Exclude THIS session's own log entry so the cluster describes prior
+  // sessions only (consistent with the counts/gaps, which exclude today).
+  var cluster = timeOfDayCluster(readLogTimestamps(root, marker));
   if (cluster) facts.push(cluster);
 
   // Trend vs the client's OWN baseline (mechanical ratio, no value judgment).
+  // baselinePerWeek is only set when priorDays.length > 0, so it is always
+  // > 0 here — no zero-baseline branch is reachable.
   if (baselinePerWeek !== null) {
+    var ratio = recentPerWeek / baselinePerWeek;
     var trend;
-    if (baselinePerWeek === 0) {
-      trend = recentCount > 0 ? 'up' : 'steady';
-    } else {
-      var ratio = recentPerWeek / baselinePerWeek;
-      if (ratio >= 1.5) trend = 'up';
-      else if (ratio <= 0.67) trend = 'down';
-      else trend = 'steady';
-    }
+    if (ratio >= 1.5) trend = 'up';
+    else if (ratio <= 0.67) trend = 'down';
+    else trend = 'steady';
     facts.push('recent cadence is ' + trend + ' vs baseline');
   }
 
@@ -389,16 +433,19 @@ function main(input) {
   var root = resolveRoot(payload);
   if (!root) return; // no readable install folder => fail open, silent
 
+  var marker = sessionMarker(payload, refMs);
+
   // (1) Log append — isolated so a failure here never blocks injection.
   try {
-    appendLog(root, sessionMarker(payload, refMs), refMs);
+    appendLog(root, marker, refMs);
   } catch (err) {
     // fail open
   }
 
   // (2) Fact injection — isolated so a failure here never blocks logging.
+  // Pass the current marker so the cluster excludes this session's own entry.
   try {
-    var facts = computeFacts(root, refMs);
+    var facts = computeFacts(root, refMs, marker);
     if (facts.length > 0) emit(facts);
   } catch (err) {
     // fail open (e.g. missing sessions/ dir)

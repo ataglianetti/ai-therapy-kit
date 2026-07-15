@@ -53,6 +53,14 @@ function lateNight(dayOffset, minute) {
   return d.toISOString();
 }
 
+// A local-time timestamp at HH:MM (local) `dayOffset` days before NOW. The
+// hook reads local hours for clustering, so only the local hour is load-bearing.
+function atLocalHour(dayOffset, hour, minute) {
+  const d = new Date(NOW - dayOffset * MS_PER_DAY);
+  d.setHours(hour, minute, 0, 0);
+  return d.toISOString();
+}
+
 function runHook(root, { sessionId, now = NOW, cwd } = {}) {
   const input = JSON.stringify(sessionId ? { session_id: sessionId } : {});
   const env = { ...process.env, USAGE_STATS_NOW_MS: String(now) };
@@ -106,6 +114,12 @@ test('spike: recent burst over a low baseline injects facts', () => {
     const ctx = parseEnvelope(stdout, 'spike');
     assert.ok(ctx.includes('8 sessions in the last 14 days'), 'recent count');
     assert.ok(ctx.includes('prior baseline'), 'baseline present');
+    // F8: assert the gap fact string AND its rendered end date. The largest
+    // gap within the lookback is 10 days, ending on the age-40 session date.
+    assert.ok(
+      ctx.includes('largest recent gap 10 days (ending 2026-06-05)'),
+      `gap fact + rendered end date, got: ${ctx}`
+    );
     assert.ok(ctx.includes('recent cadence is up vs baseline'), 'trend up');
     assert.ok(
       ctx.startsWith('Usage context (mechanical, for your judgment only'),
@@ -148,22 +162,126 @@ test('sparse: fewer than 10 sessions stays silent', () => {
   }
 });
 
-test('late-night cluster: time-of-day fact appears from log timestamps', () => {
+test('late-night cluster: time-of-day fact appears from prior log timestamps', () => {
   const root = makeRoot();
   try {
     writeSessions(root, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]); // >=10 gate met
-    // 7 late-night (02:xx local) log lines; the last marker matches the
-    // session_id below so the hook dedupes (no append) and the last 7 stay
-    // exactly these controlled entries — fully deterministic clustering.
+    // 7 PRIOR late-night (02:xx local) log lines, none matching the current
+    // session id. The hook appends its own (excluded) entry, then clusters the
+    // 7 priors. Band end is the fixed span lo+CLUSTER_SPAN_HOURS => 02:00–05:00.
     const lines = [];
     for (let i = 7; i >= 1; i--) lines.push(`${lateNight(i, i)}\tnight-${i}`);
     seedLog(root, lines);
-    const { status, stdout } = runHook(root, { sessionId: 'night-1' });
+    const { status, stdout } = runHook(root, { sessionId: 'night-current' });
     assert.equal(status, 0);
     const ctx = parseEnvelope(stdout, 'late-night cluster');
     assert.ok(
-      ctx.includes('7 of the last 7 sessions started 02:00–03:00'),
+      ctx.includes('7 of the last 7 sessions started 02:00–05:00'),
       `cluster fact present, got: ${ctx}`
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('F1 midnight-wrap cluster: a band spanning 23->0 clusters and wraps', () => {
+  const root = makeRoot();
+  try {
+    writeSessions(root, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]); // gate met
+    // 7 prior entries straddling midnight: hours 22, 22, 23, 23, 0, 0, 1.
+    // The tightest 3-hour band starts at 22 and wraps to 01:00.
+    const hoursSeq = [22, 22, 23, 23, 0, 0, 1];
+    const lines = hoursSeq.map((h, i) => `${atLocalHour(i + 1, h, 0)}\twrap-${i}`);
+    seedLog(root, lines);
+    const { status, stdout } = runHook(root, { sessionId: 'wrap-current' });
+    assert.equal(status, 0);
+    const ctx = parseEnvelope(stdout, 'midnight wrap');
+    assert.ok(
+      ctx.includes('7 of the last 7 sessions started 22:00–01:00'),
+      `wrapped cluster expected, got: ${ctx}`
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('F2 no self-inflation: the current session entry is excluded from the cluster', () => {
+  const root = makeRoot();
+  try {
+    writeSessions(root, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]); // gate met
+    // 7 in-band late-night entries where the LAST is THIS session's marker
+    // (a compact re-fire: entry already present). Counting it would give
+    // "7 of the last 7"; excluding it leaves only 6 timestamps, below the
+    // CLUSTER_MIN_ENTRIES gate => no cluster fires.
+    const lines = [];
+    for (let i = 7; i >= 2; i--) lines.push(`${lateNight(i, i)}\tprior-${i}`); // 6 prior
+    lines.push(`${lateNight(1, 1)}\tthis-session`); // 7th = current session
+    seedLog(root, lines);
+    const { status, stdout } = runHook(root, { sessionId: 'this-session' });
+    assert.equal(status, 0);
+    const ctx = parseEnvelope(stdout, 'no self-inflation');
+    assert.ok(
+      !ctx.includes('of the last 7 sessions started'),
+      `current session must not inflate the cluster, got: ${ctx}`
+    );
+    assert.ok(ctx.includes('in the last 14 days'), 'other facts still inject');
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('F3 unique-day counting: same-date files count once (no trend inflation)', () => {
+  const root = makeRoot();
+  try {
+    // Recent window: 7 unique days (ages 1,3,5,7,9,11,13) plus ONE duplicate
+    // file on age 1 => 8 files but 7 distinct days. Prior baseline is tuned so
+    // 7 recent days read "steady" while 8 files would flip the trend to "up".
+    writeSessions(root, [1, 1, 3, 5, 7, 9, 11, 13]); // 8 files, 7 unique recent days
+    writeSessions(root, [15, 18, 22, 25, 28]); // 5 prior unique days (baseline ~2.5/wk)
+    const { status, stdout } = runHook(root, { sessionId: 'sess-dupdate' });
+    assert.equal(status, 0);
+    const ctx = parseEnvelope(stdout, 'unique-day counting');
+    assert.ok(
+      ctx.includes('7 sessions in the last 14 days'),
+      `duplicate date must count once, got: ${ctx}`
+    );
+    assert.ok(
+      ctx.includes('recent cadence is steady vs baseline'),
+      `trend must not flip to up on a duplicate-date file, got: ${ctx}`
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('F11 lax-date guard: an impossible date (2025-13-45) is not a session day', () => {
+  const root = makeRoot();
+  try {
+    writeSessions(root, [1, 2, 3, 4, 5, 6, 7, 8, 9]); // 9 valid days — one below the gate
+    // Date.UTC would roll 2025-13-45 over into a real day; if counted it would
+    // push the total to 10 and open the silence gate. It must be rejected.
+    writeFileSync(path.join(root, 'sessions', '2025-13-45.md'), '# bad\n');
+    const { status, stdout } = runHook(root, { sessionId: 'sess-baddate' });
+    assert.equal(status, 0);
+    assert.equal(stdout, '', 'phantom day must not push the count over the gate');
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('F12 window boundary: a session exactly 14 days old is outside the 14-day window', () => {
+  const root = makeRoot();
+  try {
+    // 9 days inside the window (ages 0..8) + one at exactly age 14. "last 14
+    // days" == ages 0..13, so the age-14 session must NOT be in the count.
+    writeSessions(root, [0, 1, 2, 3, 4, 5, 6, 7, 8, 14]);
+    writeSessions(root, [30, 40, 50]); // older days: baseline + gate headroom
+    const { status, stdout } = runHook(root, { sessionId: 'sess-boundary' });
+    assert.equal(status, 0);
+    const ctx = parseEnvelope(stdout, 'window boundary');
+    assert.ok(
+      ctx.includes('9 sessions in the last 14 days'),
+      `age-14 session must be excluded from the window, got: ${ctx}`
     );
   } finally {
     rmSync(root, { recursive: true, force: true });

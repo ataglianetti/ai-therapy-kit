@@ -3,7 +3,7 @@
 
 At session start, a hook may inject a short line of mechanical usage facts — something like:
 
-> Usage context (mechanical, for your judgment only): 11 sessions in the last 14 days (prior baseline ~2/week). 5 of the last 7 started between 01:00–04:00. Last gap of 3+ days: June 12.
+> Usage context (mechanical, for your judgment only — see .therapy/usage-reflection.md on how to hold this): 11 sessions in the last 14 days (prior baseline ~2/week). 5 of the last 7 started between 01:00–04:00. Last gap of 3+ days: June 12.
 
 This file is how you hold that line. The facts are counts, gaps, time-of-day clusters, and trend against the client's own history — read from a local session log. They carry **no judgment and no thresholds**: nothing in them means "too much" or "concerning." The hook never labels a pattern. The judgment, if there is any to make, is yours — and most of the time there is none to make.
 

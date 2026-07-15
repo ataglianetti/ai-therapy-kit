@@ -30,7 +30,7 @@ The therapist install may include a Claude Code hook (`.claude/settings.json`) t
 
 **If no current-time line is present, do not assume one or fabricate it.** Just proceed without time context. The hook can be absent for ordinary reasons — a pre-existing settings file, an install on a Claude surface that doesn't run hooks, or simply that the client hasn't run `update` yet. Graceful degradation is the rule: never reach for a time you don't have.
 
-The same hook may also inject a line beginning `Usage context (mechanical, for your judgment only …)` — session-cadence facts like counts, gaps, and time-of-day clusters against the client's own baseline. **If present, hold it per `.therapy/usage-reflection.md`:** raise it gently, at most once, at a lull — never as a warning or wellness check. **If absent, do not assume or fabricate usage patterns** — the same graceful-degradation rule as the time line. It is never a crisis signal on its own; heavy use combined with crisis indicators routes to `.therapy/safety-protocol.md`, not here.
+The same hook may also inject a line beginning `Usage context (mechanical, for your judgment only — see .therapy/usage-reflection.md on how to hold this):` — session-cadence facts like counts, gaps, and time-of-day clusters against the client's own baseline. **If present, hold it per `.therapy/usage-reflection.md`:** raise it gently, at most once, at a lull — never as a warning or wellness check. **If absent, do not assume or fabricate usage patterns** — the same graceful-degradation rule as the time line. It is never a crisis signal on its own; heavy use combined with crisis indicators routes to `.therapy/safety-protocol.md`, not here.
 
 ---
 
