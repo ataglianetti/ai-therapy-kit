@@ -20,6 +20,18 @@
           }
         ]
       }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": ["${CLAUDE_PROJECT_DIR}/.therapy/hooks/usage-stats.js"]
+          }
+        ]
+      }
     ]
   }
 }
