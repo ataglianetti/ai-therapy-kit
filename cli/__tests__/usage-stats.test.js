@@ -168,7 +168,8 @@ test('late-night cluster: time-of-day fact appears from prior log timestamps', (
     writeSessions(root, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]); // >=10 gate met
     // 7 PRIOR late-night (02:xx local) log lines, none matching the current
     // session id. The hook appends its own (excluded) entry, then clusters the
-    // 7 priors. Band end is the fixed span lo+CLUSTER_SPAN_HOURS => 02:00–05:00.
+    // 7 priors. Every entry is hour 02, so the observed reach is 0 hours and the
+    // band displays the TIGHT end (F13): 02:00–03:00, not the nominal 02:00–05:00.
     const lines = [];
     for (let i = 7; i >= 1; i--) lines.push(`${lateNight(i, i)}\tnight-${i}`);
     seedLog(root, lines);
@@ -176,7 +177,7 @@ test('late-night cluster: time-of-day fact appears from prior log timestamps', (
     assert.equal(status, 0);
     const ctx = parseEnvelope(stdout, 'late-night cluster');
     assert.ok(
-      ctx.includes('7 of the last 7 sessions started 02:00–05:00'),
+      ctx.includes('7 of the last 7 sessions started 02:00–03:00'),
       `cluster fact present, got: ${ctx}`
     );
   } finally {
@@ -189,7 +190,8 @@ test('F1 midnight-wrap cluster: a band spanning 23->0 clusters and wraps', () =>
   try {
     writeSessions(root, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]); // gate met
     // 7 prior entries straddling midnight: hours 22, 22, 23, 23, 0, 0, 1.
-    // The tightest 3-hour band starts at 22 and wraps to 01:00.
+    // The band starts at 22; the last observed in-band hour is 01, so the tight
+    // end (F13) is the hour after that — 02:00 — wrapped across midnight.
     const hoursSeq = [22, 22, 23, 23, 0, 0, 1];
     const lines = hoursSeq.map((h, i) => `${atLocalHour(i + 1, h, 0)}\twrap-${i}`);
     seedLog(root, lines);
@@ -197,8 +199,31 @@ test('F1 midnight-wrap cluster: a band spanning 23->0 clusters and wraps', () =>
     assert.equal(status, 0);
     const ctx = parseEnvelope(stdout, 'midnight wrap');
     assert.ok(
-      ctx.includes('7 of the last 7 sessions started 22:00–01:00'),
+      ctx.includes('7 of the last 7 sessions started 22:00–02:00'),
       `wrapped cluster expected, got: ${ctx}`
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('F13 full-width cluster: a band that truly spans 3 hours displays the full width', () => {
+  const root = makeRoot();
+  try {
+    writeSessions(root, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]); // gate met
+    // 7 prior entries reaching the full span: hours 1,1,2,2,3,3,4. Band starts
+    // at 01; last in-band hour is 04 (offset 3), so the tight end equals the
+    // nominal full width — 05:00. This is the regression guard that a tight
+    // band-end does not UNDER-report a genuinely wide cluster.
+    const hoursSeq = [1, 1, 2, 2, 3, 3, 4];
+    const lines = hoursSeq.map((h, i) => `${atLocalHour(i + 1, h, 0)}\twide-${i}`);
+    seedLog(root, lines);
+    const { status, stdout } = runHook(root, { sessionId: 'wide-current' });
+    assert.equal(status, 0);
+    const ctx = parseEnvelope(stdout, 'full-width cluster');
+    assert.ok(
+      ctx.includes('7 of the last 7 sessions started 01:00–05:00'),
+      `full-width cluster expected, got: ${ctx}`
     );
   } finally {
     rmSync(root, { recursive: true, force: true });

@@ -186,7 +186,6 @@ function readSessionDays(root) {
     var mo = Number(m[2]);
     var d = Number(m[3]);
     var dayMs = Date.UTC(y, mo - 1, d);
-    if (isNaN(dayMs)) continue;
     // Date.UTC ROLLS OVER out-of-range parts (2025-13-45 => 2026-02-14)
     // instead of returning NaN. Reject anything that doesn't round-trip, so a
     // phantom filename can't manufacture a session day.
@@ -259,26 +258,34 @@ function timeOfDayCluster(timestamps) {
   for (var i = 0; i < recent.length; i++) {
     hours.push(new Date(recent[i]).getHours());
   }
-  var best = { count: 0, lo: 0 };
+  var best = { count: 0, lo: 0, maxOffset: 0 };
   for (var a = 0; a < hours.length; a++) {
     var lo = hours[a];
     var count = 0;
+    var maxOffset = 0;
     for (var b = 0; b < hours.length; b++) {
       // CIRCULAR hour distance so a band can wrap past midnight: with lo=22
       // and a 3-hour span, hours 22, 23, 0, 1 all fall inside. A plain
       // `h >= lo && h <= lo + span` comparison could never span the 23->0
       // boundary, so late-night clusters straddling midnight never formed.
-      if (((hours[b] - lo + 24) % 24) <= CLUSTER_SPAN_HOURS) {
+      var offset = (hours[b] - lo + 24) % 24;
+      if (offset <= CLUSTER_SPAN_HOURS) {
         count++;
+        if (offset > maxOffset) maxOffset = offset; // tightest observed reach
       }
     }
-    if (count > best.count) best = { count: count, lo: lo };
+    if (count > best.count) {
+      best = { count: count, lo: lo, maxOffset: maxOffset };
+    }
   }
   if (best.count < CLUSTER_MIN_IN_BAND) return null;
   var bandStart = pad2(best.lo) + ':00';
-  // Display the fixed band end (lo + span), wrapped mod 24, so it reads
-  // "22:00–01:00" across midnight rather than an un-wrapped hour.
-  var bandEnd = pad2((best.lo + CLUSTER_SPAN_HOURS) % 24) + ':00';
+  // Display the TIGHTEST band the data actually spans, not the full nominal
+  // CLUSTER_SPAN_HOURS window: end = the hour after the last in-band hour
+  // observed. All-02:xx reads "02:00–03:00" (maxOffset 0); a band reaching
+  // offset 3 across midnight (hours 22,23,0,1) reads "22:00–02:00", wrapped
+  // mod 24. The circular MEMBERSHIP rule above is unchanged — only the label.
+  var bandEnd = pad2((best.lo + best.maxOffset + 1) % 24) + ':00';
   return (
     best.count +
     ' of the last ' +
@@ -299,7 +306,9 @@ function largestRecentGap(days, nowDay) {
       recent.push(days[i]);
     }
   }
-  recent = uniqueSorted(recent);
+  // `days` arrives already unique-sorted (computeFacts dedups up front) and the
+  // filter above preserves order, so `recent` is still unique-sorted — no
+  // re-sort needed before the consecutive-gap scan.
   var best = null;
   for (var j = 1; j < recent.length; j++) {
     var gap = recent[j] - recent[j - 1];
