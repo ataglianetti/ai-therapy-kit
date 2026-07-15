@@ -6,6 +6,10 @@ All notable changes to Inner Dialogue.
 
 ## [Unreleased]
 
+---
+
+## [2.9.0] - 2026-07-15
+
 ### Added
 - **Profile provenance — dated writes + a staleness review ritual.** Ports the context library's "a synthesis is a hypothesis with a date on it" discipline to `profile.md`. Current-state profile entries now carry a trailing `*(YYYY-MM-DD)*` stamp marking when they were last confirmed; `Background`/formative history stays undated by design. At session start, when current-state content has gone stale — older than ~90 days *and* at least ~3 sessions since — the therapist offers *once*, at a neutral lull, to walk through the stale items as questions and refresh what still fits (same "the person outranks the housekeeping" discipline as the seeding offer; a decline writes a ~30-day marker). A new `review my profile` command triggers the same walk-through on demand, and is the migration path for legacy undated profiles — which converge to dated through confirmation alone, with **zero fabricated dates** (an invented date is a false provenance claim). Rules live in one new framework file, `profile-protocol.md` → `.therapy/profile-protocol.md`, referenced (not duplicated) by `CLAUDE.template.md` and `commands.md`. `CLAUDE.template.md 1.1.0 → 1.2.0`, `commands.md 1.4.0 → 1.5.0`.
 - **`doctor` checks for the profile-protocol file.** Warns (not errors) when `.therapy/profile-protocol.md` is absent, so pre-feature installs keep validating clean until they run `update`.
