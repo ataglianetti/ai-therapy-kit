@@ -71,6 +71,9 @@ jobs:
           node-version: '20'
           registry-url: 'https://registry.npmjs.org'
       # Trusted Publishing requires npm 11.5.1+ for OIDC-only publishing.
-      # Node 20 ships with npm 10.x, so upgrade before publish.
-      - run: npm install -g npm@latest
+      # Node 20 ships with npm 10.x, so upgrade before publish. Pin to the
+      # 11.x line: npm@latest is now 12.x, which requires Node >=22.22 and
+      # fails EBADENGINE on this Node 20 runner. The whole 11.x line supports
+      # Node ^20.17 and is >=11.5.1, so OIDC publishing still works.
+      - run: npm install -g npm@11
       - run: npm publish --provenance --access public
