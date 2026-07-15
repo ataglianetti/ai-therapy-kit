@@ -1,5 +1,5 @@
 {
-  "version": "1.4.0",
+  "version": "1.5.0",
   "description": "Inner Dialogue updatable components",
   "base_url": "https://raw.githubusercontent.com/ataglianetti/inner-dialogue/main/",
   "components": {
@@ -27,12 +27,24 @@
       "required": true,
       "description": "Mechanical crisis-language backstop hook (English-only pattern matcher). Injects the safety-protocol reminder when a prompt matches crisis language; the prose safety protocol remains authoritative."
     },
+    "usage-stats": {
+      "file": "hooks/usage-stats.js",
+      "target": ".therapy/hooks/usage-stats.js",
+      "required": true,
+      "description": "Mechanical usage-stats SessionStart hook (facts-only). Injects usage cadence for the therapist's judgment; fail-open."
+    },
+    "usage-reflection": {
+      "file": "usage-reflection.md",
+      "target": ".therapy/usage-reflection.md",
+      "required": true,
+      "description": "Therapist guidance for holding injected usage data (raise once, gently; not a crisis screen)."
+    },
     "claude-settings": {
       "file": "claude-settings.template.json",
       "target": ".claude/settings.json",
       "required": false,
       "scaffold_only": true,
-      "description": "Claude Code hooks for the therapist install. Registers two UserPromptSubmit hooks: the current-local-time hook and the safety-net crisis-language backstop hook. Scaffolded on install/update; never overwritten."
+      "description": "Claude Code hooks for the therapist install. Registers two UserPromptSubmit hooks (the current-local-time hook and the safety-net crisis-language backstop hook) and the SessionStart usage-stats hook. Scaffolded on install/update; never overwritten."
     },
     "context-index": {
       "file": "context/index.template.md",
