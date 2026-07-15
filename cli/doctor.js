@@ -5,7 +5,7 @@ import { spawnSync } from 'node:child_process';
 import { therapyPaths } from './lib/paths.js';
 import { readVersionJson } from './lib/version.js';
 import { hashFile } from './lib/hash.js';
-import { hasSafetyNetHook } from './lib/settings.js';
+import { hasSafetyNetHook, hasHook, USAGE_STATS_DESC } from './lib/settings.js';
 
 // Minimal seed sections. Profiles are expected to evolve beyond these — the
 // LLM is instructed to add H2s as themes emerge and reorganize around active
@@ -244,6 +244,52 @@ export async function doctor(opts) {
   } else {
     warnings.push(
       `safety-net hook not registered in .claude/settings.json — the hook will not run on prompts even if the script is present. Run \`${safetyNetFix}\` to register it.`
+    );
+  }
+
+  // Usage-stats reflection checks. Same warning-severity posture as the
+  // safety-net checks above: this is a reflection aid, not the safety net, so
+  // pre-feature or pre-`update` installs must keep validating clean until the
+  // user runs update. The Claude Code version floor above already covers
+  // exec-form hook support, so it is not re-checked here.
+  const usageStatsFix = `npx inner-dialogue@latest update --path "${paths.root}"`;
+  if (existsSync(paths.usageStatsHook)) {
+    ok.push('.therapy/hooks/usage-stats.js present');
+    // Integrity check against the hash recorded in version.json, mirroring the
+    // safety-net check but softer: editing a reflection aid is lower-stakes
+    // than editing the crisis backstop. No record → skip gracefully.
+    const usageRecord = versionData?.files?.['.therapy/hooks/usage-stats.js'];
+    if (usageRecord?.hash) {
+      const installedHash = await hashFile(paths.usageStatsHook);
+      if (installedHash === usageRecord.hash) {
+        ok.push('usage-stats hook matches its installed version');
+      } else {
+        warnings.push(
+          `usage-stats hook (.therapy/hooks/usage-stats.js) has been modified from the shipped version. It's a reflection aid rather than the safety net, so edits are lower-stakes — but they can skew the usage signal it records. To restore the shipped version, run \`${usageStatsFix} --force\` (note: --force also overwrites any other framework files you've edited; a backup is taken first).`
+        );
+      }
+    }
+  } else {
+    warnings.push(
+      `usage-stats hook script missing (.therapy/hooks/usage-stats.js) — the session-usage reflection signal is not installed. Run \`${usageStatsFix}\` to install it.`
+    );
+  }
+  if (existsSync(paths.usageReflection)) {
+    ok.push('.therapy/usage-reflection.md present');
+  } else {
+    warnings.push(
+      `usage-reflection guidance missing (.therapy/usage-reflection.md) — the usage-pattern reflection prompt is not installed. Run \`${usageStatsFix}\` to install it.`
+    );
+  }
+  if (settingsMalformed) {
+    // Registration can't be verified and `update` can't fix a malformed file —
+    // the malformed-settings warning above already carries the real fix, so
+    // don't stack a "run update" prescription on top of it.
+  } else if (hasHook(claudeSettings, USAGE_STATS_DESC)) {
+    ok.push('usage-stats hook registered in .claude/settings.json');
+  } else {
+    warnings.push(
+      `usage-stats hook not registered in .claude/settings.json (SessionStart) — the hook will not run at session start even if the script is present. Run \`${usageStatsFix}\` to register it.`
     );
   }
 
