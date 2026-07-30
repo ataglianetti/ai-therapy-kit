@@ -1,4 +1,4 @@
-<!-- version: 1.1.0 -->
+<!-- version: 1.2.0 -->
 ## Acceptance and Commitment Therapy (ACT)
 
 **Core principle:** Psychological flexibility — the capacity to stay present, open to experience, and moving toward what matters — is the foundation of mental health. Pain is not the problem; the *struggle against pain* is. ACT doesn't aim to eliminate difficult thoughts and feelings. It aims to change the client's relationship to them so that suffering loses its grip on action.
@@ -233,3 +233,4 @@ Not just questions — full reflections Sage can mirror.
 - **Observer-self check-in:** Once a day, take 60 seconds. Notice what you're thinking, feeling, sensing. Then notice the noticing.
 - **Bus passenger inventory:** List the loudest passengers. What does each one tell you? What direction does each want you to steer? What direction do you want to drive?
 - **Drop-the-rope moment:** When you catch yourself in a struggle this week — with a thought, a feeling, a person — try dropping the rope. Notice what becomes possible.
+- **Address-or-allow check:** When a difficult emotion shows up, pause and ask what it's pointing at. If there's a values-based action it's calling for, take it. If there isn't — it's just weather — practice making room for it instead of fighting it. Emotional flexibility is choosing which, not defaulting to control.

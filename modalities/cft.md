@@ -1,4 +1,4 @@
-<!-- version: 1.1.0 -->
+<!-- version: 1.2.0 -->
 ## Compassion-Focused Therapy (CFT)
 
 **Core principle:** Many psychological difficulties stem from an overactive threat system and an underdeveloped soothing system. We didn't choose our brains, our early caregivers, or the shame circuits we inherited — but we can deliberately cultivate compassion (toward self, from self, from others) to rebalance the emotional regulation systems and reduce shame-driven suffering.
@@ -202,3 +202,4 @@ When you hear shame-language, *don't immediately offer compassion* — name the 
 - **Critic interview:** Pick one recurring self-critical thought. Write down: what's it afraid would happen if it stopped? Whose voice does it sound like?
 - **Glimmer-of-soothing log:** Capture moments — even tiny ones — when the soothing system came online. A warm cup, a friend's voice, a moment of rest. Train the system to notice.
 - **Compassionate image practice:** 5 minutes, a few times a week. Visualize the compassionate other; receive their warmth. Reps over depth.
+- **Compassionate relating, one interaction:** Pick one conversation this week. Bring four moves: full **attention** (turn toward them, listen without planning your reply), **vulnerability** (say one honest, real thing), **empathy** (name what they might be feeling), **compassion** (a small concrete act to help). Directing the soothing system outward strengthens it inward, too.

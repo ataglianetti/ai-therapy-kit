@@ -1,4 +1,4 @@
-<!-- version: 1.1.0 -->
+<!-- version: 1.2.0 -->
 ## Cognitive Behavioral Therapy (CBT)
 
 **Core principle:** Thoughts, feelings, and behaviors are interconnected. The interpretation of an event — not the event itself — drives the emotional and behavioral response. When automatic thoughts are inaccurate or unhelpful, mood and action shift downstream. CBT is the most rigorously studied modality in the set; when an issue is amenable to it, it works fast.
@@ -69,6 +69,31 @@ For depression, low motivation, and "I don't feel like doing anything." The trap
 5. **Review weekly.** What got done? What was the mood impact? Adjust the schedule. Iterate.
 
 When clients say "I just need to feel motivated first" — name the trap directly. Motivation follows action, not the other way around.
+
+---
+
+### Habit Formation Protocol
+
+For making a helpful behavior automatic, or weakening an unhelpful one. Behavioral activation gets an
+action *started*; habit formation makes it *stick* past the burst of initial willpower. Grounded in
+habit research (cue-response learning; Lally et al. found automaticity builds over roughly 2 months of
+repetition) — the practical lever is the **cue → routine → reward** loop.
+
+1. **Pick one small, specific behavior.** Not "exercise more" — "10 push-ups after I brush my teeth."
+   Specific and tiny beats ambitious and vague; tiny behaviors are what sustain.
+2. **Engineer the cue.** Anchor the routine to an existing trigger — a time, a location, or a habit you
+   already have ("after morning coffee"). External reminders (a calendar pop-up, a note left in view, an
+   X marked on a visible calendar) carry it until the cue is internal.
+3. **Define the routine.** The concrete steps. Keep it small enough that the predicted effort doesn't
+   trigger avoidance.
+4. **Attach a reward.** What makes it feel good — intrinsic (the act itself), or a small physical/mental
+   marker (the satisfaction of the X). The reward is what trains the loop.
+5. **Link it to meaning.** Get clear on *why* this matters to you — connect it to a value or a person you
+   care about. Meaning-linked habits survive low-motivation days that willpower alone doesn't.
+6. **Name what to unlearn.** Breaking an old habit means identifying its cue and reward and substituting
+   a new routine onto the same cue — not white-knuckling abstinence.
+
+Pairs with Behavioral Activation (start the action) and with ACT values work (the meaning the habit serves).
 
 ---
 
@@ -189,3 +214,4 @@ Not just prompts — full reflections Sage can mirror.
 - **Worry time:** Schedule 20 minutes a day for contained worry. Outside that window, when worry shows up, write it down and defer it to worry time.
 - **One exposure rung per week:** From the hierarchy. Climb deliberately.
 - **Catch and name:** When a distortion shows up in real time, name it out loud or in writing. Naming creates distance.
+- **Habit loop, one behavior:** Pick a single small behavior. Engineer its cue, routine, and reward; link it to why it matters. Run it daily and track the streak.
