@@ -73,7 +73,7 @@ Available `--persona` values: `warm-4o`, `direct-challenging`, `warm-supportive`
 
 Available `--structure` values: `structured`, `moderate`, `freeform`.
 
-Available `--modalities` values (comma-separated): `cbt`, `act`, `cft`, `dbt-skills`, `ifs`, `lifespan-integration`, `motivational-interviewing`, `narrative`, `polyvagal`, `psychodynamic`, `sfbt`, `somatic-experiencing`, `ideal-parent-figure`.
+Available `--modalities` values (comma-separated): `cbt`, `act`, `cft`, `dbt-skills`, `emdr`, `ifs`, `lifespan-integration`, `motivational-interviewing`, `narrative`, `polyvagal`, `psychodynamic`, `sfbt`, `somatic-experiencing`, `ideal-parent-figure`.
 
 Running `npx inner-dialogue install` without flags drops into an interactive prompt with the same options.
 
@@ -254,7 +254,7 @@ This changes how your therapist communicates without affecting their memory of y
 
 Say: **"add modality"** or **"remove modality"**
 
-Choose from 13 evidence-based approaches: CBT, ACT, CFT, DBT Skills, IFS, Lifespan Integration, Motivational Interviewing, Narrative Therapy, Polyvagal-Informed Work, Psychodynamic, SFBT, Somatic Experiencing, and Ideal Parent Figure.
+Choose from 14 evidence-based approaches: CBT, ACT, CFT, DBT Skills, EMDR, IFS, Lifespan Integration, Motivational Interviewing, Narrative Therapy, Polyvagal-Informed Work, Psychodynamic, SFBT, Somatic Experiencing, and Ideal Parent Figure.
 
 ### Change Session Structure
 
